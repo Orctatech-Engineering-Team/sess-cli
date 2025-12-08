@@ -15,7 +15,7 @@ type GH struct{}
 
 // Issue represents a GitHub issue with fields returned from JSON
 type Issue struct {
-	ID    int    `json:"id"`
+	ID    string `json:"id"`
 	Title string `json:"title"`
 	URL   string `json:"url"`
 }

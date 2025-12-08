@@ -486,7 +486,7 @@ func RunStartTUI(featureName string) error {
 	// 5. Run main start model with live logs
 	fullBranch := branchType + "/" + sanitizeBranchName(branchName)
 	if selectedIssue != nil {
-		fmt.Printf("Starting session for issue #%d: %s\n", selectedIssue.ID, selectedIssue.Title)
+		fmt.Printf("Starting session for issue %s: %s\n", selectedIssue.ID, selectedIssue.Title)
 		fmt.Printf("Branch: %s\n\n", fullBranch)
 	}
 
