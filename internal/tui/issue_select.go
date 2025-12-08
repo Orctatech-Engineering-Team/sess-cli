@@ -17,7 +17,7 @@ type issueItem struct {
 }
 
 func (i issueItem) FilterValue() string { return i.issue.Title }
-func (i issueItem) Title() string       { return fmt.Sprintf("%s: %s", i.issue.ID, i.issue.Title) }
+func (i issueItem) Title() string       { return fmt.Sprintf("#%s: %s", i.issue.ID, i.issue.Title) }
 func (i issueItem) Description() string { return i.issue.URL }
 
 // issuesLoadedMsg is sent when issues are successfully loaded
@@ -52,14 +52,7 @@ func newIssueSelectModel() issueSelectModel {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#6f03fc"))
 
 	// Create empty list (will be populated when issues load)
-	d := list.NewDefaultDelegate()
-	c := lipgloss.Color("#6f03fc")
-	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(c).BorderLeftForeground(c)
-	d.Styles.SelectedDesc = d.Styles.SelectedTitle
-
-	l := list.New([]list.Item{}, d, 80, 20)
-	l.Title = "Select an issue"
-	l.SetShowHelp(true)
+	l := newStyledList([]list.Item{}, "Select an issue")
 	l.SetShowFilter(true)
 
 	return issueSelectModel{

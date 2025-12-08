@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/lipgloss"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -47,22 +46,12 @@ type promptModel struct {
 }
 
 func newPromptModel() promptModel {
-	// Delegate
-	d := list.NewDefaultDelegate()
-
-	// Change colors
-	c := lipgloss.Color("#6f03fc")
-	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(c).BorderLeftForeground(c)
-	// d.Styles.SelectedDesc = d.Styles.SelectedTitle // reuse title style
-
-	// Items
 	items := []list.Item{
 		choiceAutomatic,
 		choiceSelect,
 	}
 
-	l := list.New(items, d, 80, 10)
-	l.Title = "Select and issue or start without an issue"
+	l := newStyledList(items, "Select an issue or start without an issue")
 
 	return promptModel{list: l}
 }
@@ -185,19 +174,13 @@ type branchTypeModel struct {
 }
 
 func newBranchTypeModel() branchTypeModel {
-	d := list.NewDefaultDelegate()
-	c := lipgloss.Color("#6f03fc")
-	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(c).BorderLeftForeground(c)
-	d.Styles.SelectedDesc = d.Styles.SelectedTitle
-
 	items := []list.Item{
 		choiceFeature,
 		choiceBugfix,
 		choiceRefactor,
 	}
 
-	l := list.New(items, d, 80, 10)
-	l.Title = "Select branch type"
+	l := newStyledList(items, "Select branch type")
 
 	return branchTypeModel{list: l}
 }
@@ -351,7 +334,7 @@ func (m startModel) View() string {
 	return s
 }
 
-// runStart orchestrates checkout main → pull → create branch with live logs
+// runStart orchestrates checkout dev → pull → create branch with live logs
 func runStart(p *tea.Program, branchType, branchName string) {
 	streamStep(p, ".", []string{"checkout", "dev"}, func() {
 		streamStep(p, ".", []string{"pull", "origin", "dev"}, func() {
@@ -441,11 +424,6 @@ func RunStartTUI(featureName string) error {
 	}
 	if dirty {
 		// Show options with stash/commit/discard choices
-		d := list.NewDefaultDelegate()
-		c := lipgloss.Color("#6f03fc")
-		d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(c).BorderLeftForeground(c)
-		d.Styles.SelectedDesc = d.Styles.SelectedTitle
-
 		items := []list.Item{
 			choiceStash,
 			choiceCommit,
@@ -453,9 +431,7 @@ func RunStartTUI(featureName string) error {
 			choiceQuit,
 		}
 
-		l := list.New(items, d, 80, 10)
-		l.Title = "Repository has uncommitted changes. What would you like to do?"
-
+		l := newStyledList(items, "Repository has uncommitted changes. What would you like to do?")
 		dirtyPrompt := promptModel{list: l}
 		dirtyProgram := tea.NewProgram(dirtyPrompt)
 		final, err := dirtyProgram.Run()
