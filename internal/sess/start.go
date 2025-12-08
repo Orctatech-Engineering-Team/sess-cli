@@ -4,33 +4,48 @@ Copyright © 2025 Bernard Katamanso <bernard@orctatech.com>
 package sess
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/Orctatech-Engineering-Team/Sess/internal/db"
 	"github.com/Orctatech-Engineering-Team/Sess/internal/tui"
 	"github.com/spf13/cobra"
 )
 
 // startCmd represents the start command
 var startCmd = &cobra.Command{
-	Use:   "start",
-	Short: "Start a new feature branch workflow",
-	Long:  ` This command will start a new workflow.`,
+	Use:   "start [feature-name]",
+	Short: "Start a new session",
+	Long:  "Start a new work session, optionally linked to a GitHub issue. Creates a feature branch and tracks time.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return tui.RunStartTUI("")
+		// Get current directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
 		}
-		return tui.RunStartTUI(args[0])
+
+		// Open database
+		dbPath, err := db.GetDefaultDBPath()
+		if err != nil {
+			return fmt.Errorf("failed to get database path: %w", err)
+		}
+
+		database, err := db.Open(dbPath)
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer database.Close()
+
+		// Pass database to TUI
+		featureName := ""
+		if len(args) > 0 {
+			featureName = args[0]
+		}
+
+		return tui.RunStartTUI(featureName, cwd, database)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(startCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// startCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// startCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

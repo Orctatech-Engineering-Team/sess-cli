@@ -9,9 +9,9 @@ A CLI tool that helps developers manage focused work sessions tied to GitHub iss
 Every project tracked by SESS exists in one of four states:
 
 ```
-┌──────┐    start     ┌────────┐    pause     ┌────────┐
+┌──────┐    start    ┌────────┐    pause     ┌────────┐
 │ IDLE │────────────>│ ACTIVE │<────────────>│ PAUSED │
-└──────┘             └────────┘    resume     └────────┘
+└──────┘             └────────┘    resume    └────────┘
                           │
                           │ end
                           ▼
@@ -33,14 +33,28 @@ Instead of managing git branches, commits, and PRs manually, SESS makes you thin
 
 ---
 
-## Current Features (v0.1)
+## Current Features (MVP1 - v0.2)
 
-- **Interactive Session Start** - TUI workflow for creating feature branches
+### Session Management
+
+- **Start Sessions** - Create feature branches with full context tracking
+- **Pause/Resume** - Interrupt work and resume later with preserved state
+- **View Status** - Check active session details with elapsed time
+- **List Projects** - See all tracked projects across your system
+
+### Interactive Workflows
+
 - **GitHub Issue Integration** - Select issues directly from the CLI
 - **Branch Type Selection** - Automatic prefixes: `feature/`, `bugfix/`, `refactor/`
 - **Repository State Management** - Ensures clean state before branching (stash/commit/discard)
 - **Real-time Git Streaming** - Live output during long-running operations
-- **Workflow Automation** - Checkout base → Pull latest → Create feature branch
+
+### Persistence & Tracking
+
+- **SQLite Database** - Global session tracking at `~/.sess-cli/sess.db`
+- **Project Tracking** - Automatically tracks all repositories you use SESS in
+- **Time Tracking** - Cumulative elapsed time across pause/resume cycles
+- **Session History** - All sessions stored for future analytics
 
 ### Demo
 
@@ -124,26 +138,68 @@ git add .
 git commit -m "Implement user profile API"
 ```
 
-### 4. Check Session Status (Coming Soon)
+### 4. Check Session Status
 
 ```bash
 # See active session details
 sess status
 # Output:
-# Session: ACTIVE
+# Project: sess-cli
+# Path: /path/to/sess-cli
+# Base Branch: dev
+#
+# State: ACTIVE
 # Branch: feature/user-profile-page
 # Issue: #123 - Add user authentication
-# Duration: 1h 23m
+# Elapsed: 1h 23m 45s
+# Started: 2025-12-08 14:30:00
 ```
 
-### 5. Pause When Interrupted (Coming Soon)
+### 5. Pause When Interrupted
 
 ```bash
 sess pause
-# Session paused. Resume anytime with: sess resume
+# Session paused
+# Branch: feature/user-profile-page
+# Total elapsed: 1h 23m 45s
+#
+# Resume anytime with: sess resume
 ```
 
-### 6. End Session and Create PR (Coming Soon)
+### 6. Resume Later
+
+```bash
+sess resume
+# Checking out branch: feature/user-profile-page
+# Branch checked out
+#
+# Session resumed
+# Branch: feature/user-profile-page
+# Issue: #123 - Add user authentication
+# Total elapsed: 1h 23m 45s
+```
+
+### 7. View All Projects
+
+```bash
+sess projects
+# Tracked Projects (3)
+#
+# 1. sess-cli (current)
+#    /path/to/sess-cli
+#    Base: dev
+#    Session: active on feature/user-profile
+#    Elapsed: 1h 23m
+#    Last used: just now
+#
+# 2. my-app
+#    /path/to/my-app
+#    Base: main
+#    No active session
+#    Last used: 2 hours ago
+```
+
+### 8. End Session and Create PR (Coming in Phase 3)
 
 ```bash
 sess end
@@ -172,7 +228,7 @@ sess end
 
 ## Roadmap
 
-### Phase 1: Core Session Management ✅ (Current)
+### Phase 1: Core Session Management (Current)
 
 - [x] Interactive TUI for session start
 - [x] GitHub issue selection
@@ -181,7 +237,7 @@ sess end
 - [x] Real-time git operation feedback
 - [x] Basic workflow automation
 
-### Phase 2: State Persistence 🚧 (Next)
+### Phase 2: State Persistence (Next)
 
 **Goal:** Track session state across commands
 
@@ -205,7 +261,7 @@ sess end
   - [ ] Continue time tracking
   - [ ] Checkout session branch if needed
 
-### Phase 3: End-to-End Workflow 🔮
+### Phase 3: End-to-End Workflow
 
 **Goal:** Complete the session lifecycle from start to PR
 
@@ -226,7 +282,7 @@ sess end
   - [ ] Pause workflow, provide resolution instructions
   - [ ] Resume PR creation after resolution
 
-### Phase 4: Authentication & Configuration 🔮
+### Phase 4: Authentication & Configuration
 
 **Goal:** Flexible setup and secure authentication
 
@@ -246,7 +302,7 @@ sess end
   - [ ] Default issue labels
   - [ ] PR template path
 
-### Phase 5: Time Tracking & Analytics 🔮
+### Phase 5: Time Tracking & Analytics
 
 **Goal:** Understand productivity patterns
 
@@ -264,7 +320,7 @@ sess end
   - [ ] Focus time heatmap
   - [ ] Issue completion velocity
 
-### Phase 6: Advanced Features 🔮
+### Phase 6: Advanced Features
 
 **Goal:** Power user capabilities
 
@@ -299,9 +355,9 @@ SESS follows a clean, layered architecture:
 ├─────────────────────────────────────┤
 │  TUI Layer (Bubble Tea)             │  Interactive workflows
 ├─────────────────────────────────────┤
-│  Business Logic                      │  Session orchestration
+│  Business Logic                     │  Session orchestration
 ├─────────────────────────────────────┤
-│  Integration Layer                   │  Git/GitHub wrappers
+│  Integration Layer                  │  Git/GitHub wrappers
 ├─────────────────────────────────────┤
 │  External Tools (git, gh)           │  Shell commands
 └─────────────────────────────────────┘
@@ -605,6 +661,7 @@ No! SESS wraps git and GitHub CLI. You can still use git commands directly. SESS
 ### What data does SESS store?
 
 Locally only:
+
 - Session state (`.sess-cli/session.json`)
 - Session history (`.sess-cli/sessions.db`)
 - Configuration (`.sess-cli/config.json`)
@@ -617,7 +674,7 @@ Nothing is sent to external servers (except GitHub API calls via `gh`).
 
 ### "command not found: gh"
 
-Install GitHub CLI: https://cli.github.com/
+Install GitHub CLI: <https://cli.github.com/>
 
 ### "Not a git repository"
 
@@ -634,6 +691,7 @@ gh auth login
 ### TUI looks broken / weird characters
 
 Your terminal might not support UTF-8 or 256 colors. Try a modern terminal:
+
 - macOS: iTerm2, Warp
 - Linux: GNOME Terminal, Alacritty
 - Windows: Windows Terminal
@@ -673,6 +731,7 @@ SESS is inspired by:
 ## Acknowledgments
 
 Built with:
+
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) by Charm
 - [Cobra](https://github.com/spf13/cobra) by spf13
 - [GitHub CLI](https://cli.github.com/) by GitHub

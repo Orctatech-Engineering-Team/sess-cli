@@ -390,7 +390,7 @@ case someMsg:
 
 ```
 User Input → Update() → Model Change → View() → Terminal
-     ↑                                              │
+     ↑                                             │
      └──────────── Program Loop ───────────────────┘
 ```
 
@@ -1209,7 +1209,7 @@ if err != nil {
      /      \ Some integration tests
     /________\
    /          \ Many unit tests
-  /______________\
+  /____________\
 ```
 
 **Focus on:**

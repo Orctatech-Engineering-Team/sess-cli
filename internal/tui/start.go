@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Orctatech-Engineering-Team/Sess/internal/db"
 	"github.com/Orctatech-Engineering-Team/Sess/internal/git"
+	"github.com/Orctatech-Engineering-Team/Sess/internal/session"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -349,9 +351,29 @@ func runStart(p *tea.Program, branchType, branchName string) {
 
 // ---------------- Public Entry ----------------
 
-func RunStartTUI(featureName string) error {
+func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	var branchName string
 	var selectedIssue *git.Issue
+
+	// Create session manager
+	mgr := session.NewManager(database)
+
+	// Initialize or get project (default base branch is "dev")
+	project, err := mgr.InitializeProject(cwd, "dev")
+	if err != nil {
+		return fmt.Errorf("failed to initialize project: %w", err)
+	}
+
+	// Check if there's already an active session
+	existingSession, err := mgr.GetActiveSession(project.ID)
+	if err != nil {
+		return fmt.Errorf("failed to check for active session: %w", err)
+	}
+
+	if existingSession != nil {
+		return fmt.Errorf("there is already an %s session on branch '%s'\nUse 'sess status' to view it, 'sess pause' to pause it, or finish the current session first",
+			existingSession.State, existingSession.Branch)
+	}
 
 	// 1. Ask if user wants to select an issue or start without one
 	if featureName == "" {
@@ -468,6 +490,37 @@ func RunStartTUI(featureName string) error {
 
 	p := tea.NewProgram(newStartModel(fullBranch))
 	go runStart(p, branchType, branchName) // start git orchestration in background
-	_, err = p.Run()
-	return err
+	finalModel, err := p.Run()
+	if err != nil {
+		return err
+	}
+
+	// Check if git operations succeeded
+	if sm, ok := finalModel.(startModel); ok {
+		if sm.err != nil {
+			return sm.err
+		}
+	}
+
+	// 6. Persist session to database
+	issueID := ""
+	issueTitle := ""
+	if selectedIssue != nil {
+		issueID = selectedIssue.ID
+		issueTitle = selectedIssue.Title
+	}
+
+	_, err = mgr.StartSession(project.ID, fullBranch, issueID, issueTitle, branchType)
+	if err != nil {
+		// Session creation failed, but git operations succeeded
+		// Print warning but don't fail
+		fmt.Printf("\n⚠️  Warning: Failed to save session to database: %v\n", err)
+		fmt.Println("Your branch was created successfully, but session tracking is unavailable.")
+	} else {
+		fmt.Println("\n✅ Session started and saved!")
+		fmt.Println("💡 Use 'sess status' to view session details")
+		fmt.Println("💡 Use 'sess pause' to pause when you need a break")
+	}
+
+	return nil
 }
