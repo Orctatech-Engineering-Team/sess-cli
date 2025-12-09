@@ -216,19 +216,20 @@ sess end
 
 | Command | Status | Description |
 |---------|--------|-------------|
-| `sess start [name]` | ✅ **Available** | Start a new session, optionally linked to GitHub issue |
-| `sess pause` | 🚧 Planned | Pause current session |
-| `sess resume` | 🚧 Planned | Resume paused session |
-| `sess end` | 🚧 Planned | End session, commit, push, open PR |
-| `sess status` | 🚧 Planned | Show active session details |
-| `auth login` | 🚧 Planned | Authenticate with GitHub (currently uses `gh` auth) |
-| `config init` | 🚧 Planned | Initialize CLI in repo with custom settings |
+| `sess start [name]` | ✅ **MVP1** | Start a new session, optionally linked to GitHub issue |
+| `sess status` | ✅ **MVP1** | Show current session status with elapsed time |
+| `sess pause` | ✅ **MVP1** | Pause current session and stop time tracking |
+| `sess resume` | ✅ **MVP1** | Resume paused session and continue time tracking |
+| `sess projects` | ✅ **MVP1** | List all tracked projects across the system |
+| `sess end` | 🚧 Phase 3 | End session, commit, push, open PR |
+| `sess auth` | 🚧 Phase 4 | Authenticate with GitHub (currently uses `gh` auth) |
+| `sess config` | 🚧 Phase 4 | Initialize CLI in repo with custom settings |
 
 ---
 
 ## Roadmap
 
-### Phase 1: Core Session Management (Current)
+### Phase 1: Core Session Management ✅ **COMPLETE**
 
 - [x] Interactive TUI for session start
 - [x] GitHub issue selection
@@ -237,31 +238,43 @@ sess end
 - [x] Real-time git operation feedback
 - [x] Basic workflow automation
 
-### Phase 2: State Persistence (Next)
+### Phase 2: State Persistence ✅ **COMPLETE (MVP1 - v0.2.0)**
 
 **Goal:** Track session state across commands
 
-- [ ] **Session Model Activation**
-  - [ ] Store active session in `.sess-cli/session.json`
-  - [ ] Persist: branch, issue, start time, state (active/paused)
-  - [ ] Load session state on any command
+- [x] **Database Integration**
+  - [x] SQLite database at `~/.sess-cli/sess.db`
+  - [x] Projects table for repository tracking
+  - [x] Sessions table for state persistence
+  - [x] Pure Go implementation (no CGO)
 
-- [ ] **`sess status` Command**
-  - [ ] Show current session state (idle/active/paused/ended)
-  - [ ] Display branch, linked issue, elapsed time
-  - [ ] Show commit count, file changes
+- [x] **Session Model Activation**
+  - [x] Store active session in database
+  - [x] Persist: branch, issue, start time, state (active/paused)
+  - [x] Load session state on any command
+  - [x] Track elapsed time across pause/resume cycles
 
-- [ ] **`sess pause` Command**
-  - [ ] Mark session as paused
-  - [ ] Stop time tracking
-  - [ ] Preserve branch and context
+- [x] **`sess status` Command**
+  - [x] Show current session state (idle/active/paused)
+  - [x] Display branch, linked issue, elapsed time
+  - [x] Show project information
 
-- [ ] **`sess resume` Command**
-  - [ ] Resume paused session
-  - [ ] Continue time tracking
-  - [ ] Checkout session branch if needed
+- [x] **`sess pause` Command**
+  - [x] Mark session as paused
+  - [x] Stop time tracking
+  - [x] Preserve branch and context in database
 
-### Phase 3: End-to-End Workflow
+- [x] **`sess resume` Command**
+  - [x] Resume paused session
+  - [x] Continue time tracking
+  - [x] Auto-checkout session branch if needed
+
+- [x] **`sess projects` Command**
+  - [x] List all tracked projects globally
+  - [x] Show session status for each project
+  - [x] Display last used timestamps
+
+### Phase 3: End-to-End Workflow 🚧 **NEXT**
 
 **Goal:** Complete the session lifecycle from start to PR
 
@@ -302,13 +315,14 @@ sess end
   - [ ] Default issue labels
   - [ ] PR template path
 
-### Phase 5: Time Tracking & Analytics
+### Phase 5: Time Tracking & Analytics 🔄 **PARTIALLY COMPLETE**
 
 **Goal:** Understand productivity patterns
 
-- [ ] **Session History**
-  - [ ] Store completed sessions in SQLite database
-  - [ ] Track: duration, issue, branch, commits, PR link
+- [x] **Session History** ✅ (MVP1)
+  - [x] Store completed sessions in SQLite database
+  - [x] Track: duration, issue, branch, state
+  - [ ] Track: commits, PR link (Phase 3)
 
 - [ ] **Analytics Commands**
   - [ ] `sess history` - Show recent sessions

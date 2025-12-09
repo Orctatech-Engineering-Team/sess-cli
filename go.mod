@@ -7,6 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/fang v0.4.4
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/earthboundkid/versioninfo/v2 v2.24.1
 	github.com/spf13/cobra v1.10.2
 	modernc.org/sqlite v1.40.1
 )
