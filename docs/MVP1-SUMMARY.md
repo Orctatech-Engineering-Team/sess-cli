@@ -2,7 +2,7 @@
 
 ## MVP1 Successfully Delivered
 
-**Version:** 0.2.0 (MVP1)
+**Version:** 0.2.1 (MVP1)
 **Completion Date:** December 8, 2025
 **Status:** All MVP1 features implemented and tested
 

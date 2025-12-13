@@ -50,6 +50,7 @@ git push origin v0.2.0
 ```
 
 **Tag Format:** `v<major>.<minor>.<patch>`
+
 - Example: `v0.2.0`, `v1.0.0`, `v1.2.3`
 
 ### 4. Monitor the Release
@@ -91,16 +92,19 @@ We follow [Semantic Versioning](https://semver.org/):
 ### Format: `MAJOR.MINOR.PATCH`
 
 **MAJOR (0.x.x → 1.x.x):**
+
 - Incompatible API changes
 - Breaking changes to command interface
 - Database schema changes requiring migration
 
 **MINOR (0.0.x → 0.1.x):**
+
 - New features (backward compatible)
 - New commands
 - Major enhancements
 
 **PATCH (0.0.0 → 0.0.1):**
+
 - Bug fixes
 - Performance improvements
 - Documentation updates
@@ -132,22 +136,26 @@ Mark the release as "pre-release" in GitHub UI if needed.
 For urgent bug fixes:
 
 1. Create a hotfix branch from the tag:
+
    ```bash
    git checkout -b hotfix/v0.2.1 v0.2.0
    ```
 
 2. Fix the bug and commit:
+
    ```bash
    git commit -m "Fix critical bug in pause command"
    ```
 
 3. Create a new patch version tag:
+
    ```bash
    git tag -a v0.2.1 -m "Hotfix: Fix pause command bug"
    git push origin v0.2.1
    ```
 
 4. Merge back to main:
+
    ```bash
    git checkout main
    git merge hotfix/v0.2.1
@@ -161,6 +169,7 @@ For urgent bug fixes:
 Triggers on: Push to tags matching `v*.*.*`
 
 **Steps:**
+
 1. Checkout code
 2. Setup Go 1.25
 3. Build binaries for all platforms
@@ -169,6 +178,7 @@ Triggers on: Push to tags matching `v*.*.*`
 6. Create GitHub Release with artifacts
 
 **Build flags:**
+
 ```bash
 go build -ldflags="-s -w"
 ```
@@ -183,6 +193,7 @@ Triggers on: Push to main/dev, Pull Requests
 **Purpose:** Continuous integration - verify builds work
 
 **Steps:**
+
 1. Build on Linux, macOS, Windows
 2. Run `go vet`
 3. Run tests (if present)
@@ -278,10 +289,12 @@ Get-FileHash sess-windows-amd64.zip -Algorithm SHA256
 ### Build Fails
 
 **Check Go version:**
+
 - Workflow uses Go 1.25
 - Ensure go.mod requires the correct version
 
 **Check dependencies:**
+
 ```bash
 go mod tidy
 go mod verify
@@ -290,10 +303,12 @@ go mod verify
 ### Release Not Created
 
 **Check tag format:**
+
 - Must match `v*.*.*` (e.g., `v0.2.0`)
 - Not `0.2.0` or `version-0.2.0`
 
 **Check permissions:**
+
 - Workflow needs `contents: write` permission
 - This is already set in the workflow file
 
@@ -302,6 +317,7 @@ go mod verify
 Binaries are ~15MB due to embedded SQLite. This is normal.
 
 To reduce size further:
+
 - Use UPX compression (risky, can trigger antivirus)
 - Remove unused features (not recommended)
 

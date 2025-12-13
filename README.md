@@ -33,7 +33,7 @@ Instead of managing git branches, commits, and PRs manually, SESS makes you thin
 
 ---
 
-## Current Features (MVP1 - v0.2)
+## Current Features (MVP1 - v0.2.1)
 
 ### Session Management
 
