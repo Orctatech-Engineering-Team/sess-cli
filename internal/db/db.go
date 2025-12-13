@@ -19,28 +19,29 @@ type DB struct {
 
 // Project represents a tracked repository
 type Project struct {
-	ID          int64
-	Name        string
-	Path        string
-	CreatedAt   time.Time
-	LastUsedAt  time.Time
-	BaseBranch  string
-	IsActive    bool
+	ID         int64
+	Name       string
+	Path       string
+	CreatedAt  time.Time
+	LastUsedAt time.Time
+	BaseBranch string
+	IsActive   bool
 }
 
 // Session represents a work session
 type Session struct {
-	ID             int64
-	ProjectID      int64
-	Branch         string
-	IssueID        string
-	IssueTitle     string
-	State          string // "active", "paused", "ended"
-	StartTime      time.Time
-	PauseTime      *time.Time
-	EndTime        *time.Time
-	TotalElapsed   int64 // Duration in seconds
-	BranchType     string
+	ID                int64
+	ProjectID         int64
+	Branch            string
+	IssueID           string
+	IssueTitle        string
+	State             string // "active", "paused", "ended"
+	StartTime         time.Time
+	PauseTime         *time.Time
+	EndTime           *time.Time
+	CurrentSliceStart *time.Time // When the current active slice started
+	TotalElapsed      int64      // Duration in nanoseconds
+	BranchType        string
 }
 
 const (
@@ -116,6 +117,7 @@ func (db *DB) init() error {
 		start_time DATETIME NOT NULL,
 		pause_time DATETIME,
 		end_time DATETIME,
+		current_slice_start DATETIME,
 		total_elapsed INTEGER NOT NULL DEFAULT 0,
 		branch_type TEXT,
 		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -126,9 +128,36 @@ func (db *DB) init() error {
 	CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time);
 	`
 
-	_, err := db.conn.Exec(schema)
-	if err != nil {
+	if _, err := db.conn.Exec(schema); err != nil {
 		return fmt.Errorf("failed to create schema: %w", err)
+	}
+
+	// Run migrations for existing databases
+	if err := db.runMigrations(); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	return nil
+}
+
+// runMigrations applies schema changes to existing databases
+func (db *DB) runMigrations() error {
+	// Check if current_slice_start column exists
+	var count int
+	err := db.conn.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info('sessions')
+		WHERE name = 'current_slice_start'
+	`).Scan(&count)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for current_slice_start column: %w", err)
+	}
+
+	// Add current_slice_start column if it doesn't exist
+	if count == 0 {
+		if _, err := db.conn.Exec(`ALTER TABLE sessions ADD COLUMN current_slice_start DATETIME`); err != nil {
+			return fmt.Errorf("failed to add current_slice_start column: %w", err)
+		}
 	}
 
 	return nil
@@ -260,9 +289,9 @@ func (db *DB) UpdateProject(p *Project) error {
 // CreateSession creates a new session
 func (db *DB) CreateSession(s *Session) (*Session, error) {
 	result, err := db.conn.Exec(
-		`INSERT INTO sessions (project_id, branch, issue_id, issue_title, state, start_time, branch_type)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		s.ProjectID, s.Branch, s.IssueID, s.IssueTitle, s.State, s.StartTime, s.BranchType,
+		`INSERT INTO sessions (project_id, branch, issue_id, issue_title, state, start_time, current_slice_start, total_elapsed, branch_type)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.ProjectID, s.Branch, s.IssueID, s.IssueTitle, s.State, s.StartTime, s.CurrentSliceStart, s.TotalElapsed, s.BranchType,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
@@ -280,17 +309,17 @@ func (db *DB) CreateSession(s *Session) (*Session, error) {
 // GetActiveSession retrieves the active or paused session for a project
 func (db *DB) GetActiveSession(projectID int64) (*Session, error) {
 	var s Session
-	var pauseTime, endTime sql.NullTime
+	var pauseTime, endTime, currentSliceStart sql.NullTime
 
 	err := db.conn.QueryRow(
 		`SELECT id, project_id, branch, COALESCE(issue_id, ''), COALESCE(issue_title, ''),
-		        state, start_time, pause_time, end_time, total_elapsed, COALESCE(branch_type, '')
+		        state, start_time, pause_time, end_time, current_slice_start, total_elapsed, COALESCE(branch_type, '')
 		 FROM sessions
 		 WHERE project_id = ? AND state IN ('active', 'paused')
 		 ORDER BY start_time DESC LIMIT 1`,
 		projectID,
 	).Scan(&s.ID, &s.ProjectID, &s.Branch, &s.IssueID, &s.IssueTitle, &s.State,
-		&s.StartTime, &pauseTime, &endTime, &s.TotalElapsed, &s.BranchType)
+		&s.StartTime, &pauseTime, &endTime, &currentSliceStart, &s.TotalElapsed, &s.BranchType)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -305,6 +334,9 @@ func (db *DB) GetActiveSession(projectID int64) (*Session, error) {
 	if endTime.Valid {
 		s.EndTime = &endTime.Time
 	}
+	if currentSliceStart.Valid {
+		s.CurrentSliceStart = &currentSliceStart.Time
+	}
 
 	return &s, nil
 }
@@ -313,9 +345,9 @@ func (db *DB) GetActiveSession(projectID int64) (*Session, error) {
 func (db *DB) UpdateSession(s *Session) error {
 	_, err := db.conn.Exec(
 		`UPDATE sessions
-		 SET state = ?, pause_time = ?, end_time = ?, total_elapsed = ?
+		 SET state = ?, pause_time = ?, end_time = ?, current_slice_start = ?, total_elapsed = ?
 		 WHERE id = ?`,
-		s.State, s.PauseTime, s.EndTime, s.TotalElapsed, s.ID,
+		s.State, s.PauseTime, s.EndTime, s.CurrentSliceStart, s.TotalElapsed, s.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update session: %w", err)
@@ -327,7 +359,7 @@ func (db *DB) UpdateSession(s *Session) error {
 func (db *DB) GetSessionHistory(projectID int64, limit int) ([]*Session, error) {
 	rows, err := db.conn.Query(
 		`SELECT id, project_id, branch, COALESCE(issue_id, ''), COALESCE(issue_title, ''),
-		        state, start_time, pause_time, end_time, total_elapsed, COALESCE(branch_type, '')
+		        state, start_time, pause_time, end_time, current_slice_start, total_elapsed, COALESCE(branch_type, '')
 		 FROM sessions
 		 WHERE project_id = ?
 		 ORDER BY start_time DESC LIMIT ?`,
@@ -341,10 +373,10 @@ func (db *DB) GetSessionHistory(projectID int64, limit int) ([]*Session, error) 
 	var sessions []*Session
 	for rows.Next() {
 		var s Session
-		var pauseTime, endTime sql.NullTime
+		var pauseTime, endTime, currentSliceStart sql.NullTime
 
 		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Branch, &s.IssueID, &s.IssueTitle,
-			&s.State, &s.StartTime, &pauseTime, &endTime, &s.TotalElapsed, &s.BranchType); err != nil {
+			&s.State, &s.StartTime, &pauseTime, &endTime, &currentSliceStart, &s.TotalElapsed, &s.BranchType); err != nil {
 			return nil, fmt.Errorf("failed to scan session: %w", err)
 		}
 
@@ -353,6 +385,9 @@ func (db *DB) GetSessionHistory(projectID int64, limit int) ([]*Session, error) 
 		}
 		if endTime.Valid {
 			s.EndTime = &endTime.Time
+		}
+		if currentSliceStart.Valid {
+			s.CurrentSliceStart = &currentSliceStart.Time
 		}
 
 		sessions = append(sessions, &s)

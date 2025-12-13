@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/Orctatech-Engineering-Team/Sess/internal/db"
 	"github.com/Orctatech-Engineering-Team/Sess/internal/session"
@@ -38,88 +37,61 @@ var projectsCmd = &cobra.Command{
 		}
 
 		if len(projects) == 0 {
-			fmt.Println("No tracked projects found.")
-			fmt.Println("\nRun 'sess start' in a directory to begin tracking a project.")
+			fmt.Println("No tracked projects")
+			fmt.Println("\nRun 'sess start' in a directory to begin tracking.")
 			return nil
 		}
-
-		fmt.Printf("Tracked Projects (%d)\n\n", len(projects))
 
 		// Get current directory to highlight it
 		cwd, _ := os.Getwd()
 		cwdAbs, _ := filepath.Abs(cwd)
 
-		for i, project := range projects {
+		fmt.Printf("Tracked projects (%d)\n\n", len(projects))
+
+		for _, project := range projects {
 			// Check if this is the current directory
 			isCurrent := project.Path == cwdAbs
 
 			// Get active session if any
 			sess, _ := mgr.GetActiveSession(project.ID)
 
-			// Format project name
-			projectLine := fmt.Sprintf("%d. %s", i+1, project.Name)
+			// Project name with current indicator
+			projectName := project.Name
 			if isCurrent {
-				projectLine += " (current)"
+				projectName += " *"
 			}
+			fmt.Println(projectName)
 
-			fmt.Println(projectLine)
-			fmt.Printf("%s\n", project.Path)
-			fmt.Printf("Base: %s\n", project.BaseBranch)
+			// Path (indented)
+			fmt.Printf("  %s\n", project.Path)
 
+			// Session status or idle state
 			if sess != nil {
-				// Show session info
-				stateEmoji := "🟢"
-				if sess.State == db.StatePaused {
-					stateEmoji = "🟡"
-				}
-				fmt.Printf("%s Session: %s on %s\n", stateEmoji, sess.State, sess.Branch)
-
 				elapsed := mgr.GetCurrentElapsed(sess)
-				fmt.Printf("Elapsed: %s\n", formatDuration(elapsed))
 
-				if sess.IssueID != "" {
-					fmt.Printf("Issue: #%s\n", sess.IssueID)
+				stateText := "active"
+				if sess.State == db.StatePaused {
+					stateText = "paused"
 				}
+
+				// Compact session info line
+				sessionInfo := fmt.Sprintf("  %s · %s · %s", stateText, sess.Branch, formatDuration(elapsed))
+				if sess.IssueID != "" {
+					sessionInfo += fmt.Sprintf(" · #%s", sess.IssueID)
+				}
+				fmt.Println(sessionInfo)
 			} else {
-				fmt.Println("No active session")
+				fmt.Printf("  idle · base %s\n", project.BaseBranch)
 			}
 
-			fmt.Printf("Last used: %s\n", formatRelativeTime(project.LastUsedAt))
+			// Last used timestamp
+			fmt.Printf("  %s\n", formatRelativeTime(project.LastUsedAt))
+
 			fmt.Println()
 		}
 
-		fmt.Println("Tip: Use 'cd <path>' to navigate to a project, then 'sess status' to see details")
-
 		return nil
 	},
-}
-
-func formatRelativeTime(t time.Time) string {
-	duration := time.Since(t)
-
-	if duration < time.Minute {
-		return "just now"
-	} else if duration < time.Hour {
-		minutes := int(duration.Minutes())
-		if minutes == 1 {
-			return "1 minute ago"
-		}
-		return fmt.Sprintf("%d minutes ago", minutes)
-	} else if duration < 24*time.Hour {
-		hours := int(duration.Hours())
-		if hours == 1 {
-			return "1 hour ago"
-		}
-		return fmt.Sprintf("%d hours ago", hours)
-	} else if duration < 7*24*time.Hour {
-		days := int(duration.Hours() / 24)
-		if days == 1 {
-			return "1 day ago"
-		}
-		return fmt.Sprintf("%d days ago", days)
-	} else {
-		return t.Format("2006-01-02")
-	}
 }
 
 func init() {

@@ -514,12 +514,12 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	if err != nil {
 		// Session creation failed, but git operations succeeded
 		// Print warning but don't fail
-		fmt.Printf("\n⚠️  Warning: Failed to save session to database: %v\n", err)
+		fmt.Printf("\n  Warning: Failed to save session to database: %v\n", err)
 		fmt.Println("Your branch was created successfully, but session tracking is unavailable.")
 	} else {
 		fmt.Println("\n✅ Session started and saved!")
-		fmt.Println("💡 Use 'sess status' to view session details")
-		fmt.Println("💡 Use 'sess pause' to pause when you need a break")
+		fmt.Println(" Use 'sess status' to view session details")
+		fmt.Println(" Use 'sess pause' to pause when you need a break")
 	}
 
 	return nil

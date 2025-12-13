@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on version tags like v0.2.0, v1.0.0, etc.
+      - "v*.*.*" # Triggers on version tags like v0.2.0, v1.0.0, etc.
 
 permissions:
   contents: write
@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: "1.25"
 
       - name: Get version from tag
         id: get_version
@@ -46,7 +46,7 @@ jobs:
           for PLATFORM in "${PLATFORMS[@]}"; do
             GOOS=${PLATFORM%/*}
             GOARCH=${PLATFORM#*/}
-            OUTPUT_NAME="sess-${GOOS}-${GOARCH}"
+            OUTPUT_NAME="sess"
 
             if [ "$GOOS" = "windows" ]; then
               OUTPUT_NAME="${OUTPUT_NAME}.exe"

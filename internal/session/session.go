@@ -16,7 +16,9 @@ type Manager struct {
 
 // NewManager creates a new session manager
 func NewManager(database *db.DB) *Manager {
-	return &Manager{db: database}
+	return &Manager{
+		db: database,
+	}
 }
 
 // InitializeProject initializes or retrieves a project for the given path
@@ -51,16 +53,19 @@ func (m *Manager) StartSession(projectID int64, branch, issueID, issueTitle, bra
 		return nil, fmt.Errorf("there is already an %s session on branch '%s'. Please end or pause it first", existing.State, existing.Branch)
 	}
 
+	now := time.Now()
+
 	// Create new session
 	session := &db.Session{
-		ProjectID:    projectID,
-		Branch:       branch,
-		IssueID:      issueID,
-		IssueTitle:   issueTitle,
-		State:        db.StateActive,
-		StartTime:    time.Now(),
-		TotalElapsed: 0,
-		BranchType:   branchType,
+		ProjectID:         projectID,
+		Branch:            branch,
+		IssueID:           issueID,
+		IssueTitle:        issueTitle,
+		State:             db.StateActive,
+		StartTime:         now,
+		TotalElapsed:      0,
+		BranchType:        branchType,
+		CurrentSliceStart: &now, // Track current slice start time
 	}
 
 	created, err := m.db.CreateSession(session)
@@ -73,6 +78,7 @@ func (m *Manager) StartSession(projectID int64, branch, issueID, issueTitle, bra
 	if err != nil {
 		return nil, fmt.Errorf("failed to get project: %w", err)
 	}
+
 	project.LastUsedAt = time.Now()
 	if err := m.db.UpdateProject(project); err != nil {
 		return nil, fmt.Errorf("failed to update project: %w", err)
@@ -92,27 +98,27 @@ func (m *Manager) PauseSession(projectID int64) (*db.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active session: %w", err)
 	}
-
 	if session == nil {
 		return nil, fmt.Errorf("no active session found")
 	}
-
-	if session.State == db.StatePaused {
-		return nil, fmt.Errorf("session is already paused")
-	}
-
 	if session.State != db.StateActive {
 		return nil, fmt.Errorf("can only pause an active session")
 	}
 
-	// Calculate elapsed time since start
+	// Ensure CurrentSliceStart is set (handle old sessions or corrupted state)
+	if session.CurrentSliceStart == nil {
+		return nil, fmt.Errorf("session is in invalid state: missing slice start time")
+	}
+
+	// Compute elapsed time for current slice with nanosecond precision
 	now := time.Now()
-	elapsed := int64(now.Sub(session.StartTime).Seconds())
-	session.TotalElapsed += elapsed
+	elapsed := now.Sub(*session.CurrentSliceStart)
+	session.TotalElapsed += elapsed.Nanoseconds()
 
 	// Update session state
 	session.State = db.StatePaused
 	session.PauseTime = &now
+	session.CurrentSliceStart = nil // Clear slice start when paused
 
 	if err := m.db.UpdateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to pause session: %w", err)
@@ -127,22 +133,15 @@ func (m *Manager) ResumeSession(projectID int64) (*db.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active session: %w", err)
 	}
-
-	if session == nil {
+	if session == nil || session.State != db.StatePaused {
 		return nil, fmt.Errorf("no paused session found")
 	}
 
-	if session.State == db.StateActive {
-		return nil, fmt.Errorf("session is already active")
-	}
+	now := time.Now()
 
-	if session.State != db.StatePaused {
-		return nil, fmt.Errorf("can only resume a paused session")
-	}
-
-	// Update session state
+	// Update state and start new slice
 	session.State = db.StateActive
-	session.StartTime = time.Now() // Reset start time for new active period
+	session.CurrentSliceStart = &now
 
 	if err := m.db.UpdateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to resume session: %w", err)
@@ -157,22 +156,22 @@ func (m *Manager) EndSession(projectID int64) (*db.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active session: %w", err)
 	}
-
 	if session == nil {
 		return nil, fmt.Errorf("no active session found")
 	}
 
 	now := time.Now()
 
-	// If session is active, add the current period to elapsed time
-	if session.State == db.StateActive {
-		elapsed := int64(now.Sub(session.StartTime).Seconds())
-		session.TotalElapsed += elapsed
+	// Commit any in-progress slice
+	if session.State == db.StateActive && session.CurrentSliceStart != nil {
+		elapsed := now.Sub(*session.CurrentSliceStart)
+		session.TotalElapsed += elapsed.Nanoseconds()
 	}
 
-	// Update session state
+	// Update state to ended
 	session.State = db.StateEnded
 	session.EndTime = &now
+	session.CurrentSliceStart = nil
 
 	if err := m.db.UpdateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to end session: %w", err)
@@ -183,14 +182,14 @@ func (m *Manager) EndSession(projectID int64) (*db.Session, error) {
 
 // GetCurrentElapsed calculates the current elapsed time for a session
 func (m *Manager) GetCurrentElapsed(session *db.Session) time.Duration {
-	totalSeconds := session.TotalElapsed
+	total := time.Duration(session.TotalElapsed)
 
-	// If session is active, add time since start
-	if session.State == db.StateActive {
-		totalSeconds += int64(time.Since(session.StartTime).Seconds())
+	// Add current slice time if session is active
+	if session.State == db.StateActive && session.CurrentSliceStart != nil {
+		total += time.Since(*session.CurrentSliceStart)
 	}
 
-	return time.Duration(totalSeconds) * time.Second
+	return total
 }
 
 // GetProject retrieves a project by path
@@ -211,4 +210,34 @@ func (m *Manager) ListProjects() ([]*db.Project, error) {
 // GetSessionHistory retrieves session history for a project
 func (m *Manager) GetSessionHistory(projectID int64, limit int) ([]*db.Session, error) {
 	return m.db.GetSessionHistory(projectID, limit)
+}
+
+// SyncActiveSession updates elapsed time for currently active session without changing state
+// Useful for periodic syncing in long-running sessions
+func (m *Manager) SyncActiveSession(projectID int64) (*db.Session, error) {
+	session, err := m.db.GetActiveSession(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active session: %w", err)
+	}
+	if session == nil || session.State != db.StateActive {
+		return session, nil // Nothing to sync
+	}
+
+	if session.CurrentSliceStart == nil {
+		return nil, fmt.Errorf("active session has no slice start time")
+	}
+
+	// Calculate and commit current slice
+	now := time.Now()
+	elapsed := now.Sub(*session.CurrentSliceStart)
+	session.TotalElapsed += elapsed.Nanoseconds()
+
+	// Restart slice from now
+	session.CurrentSliceStart = &now
+
+	if err := m.db.UpdateSession(session); err != nil {
+		return nil, fmt.Errorf("failed to sync session: %w", err)
+	}
+
+	return session, nil
 }

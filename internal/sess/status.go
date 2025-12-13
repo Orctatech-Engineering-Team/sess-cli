@@ -3,6 +3,7 @@ package sess
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Orctatech-Engineering-Team/Sess/internal/db"
 	"github.com/Orctatech-Engineering-Team/Sess/internal/session"
@@ -42,8 +43,8 @@ var statusCmd = &cobra.Command{
 		}
 
 		if project == nil {
-			fmt.Println("❌ This directory is not a tracked SESS project.")
-			fmt.Println("\nRun 'sess start' to begin a session and track this project.")
+			fmt.Println("Not a tracked project")
+			fmt.Println("\nInitialize with 'sess start' to begin tracking.")
 			return nil
 		}
 
@@ -54,11 +55,7 @@ var statusCmd = &cobra.Command{
 		}
 
 		if sess == nil {
-			fmt.Printf("Project: %s\n", project.Name)
-			fmt.Printf("Path: %s\n", project.Path)
-			fmt.Printf("Base Branch: %s\n", project.BaseBranch)
-			fmt.Println("\nState: IDLE")
-			fmt.Println("\nNo active session. Run 'sess start' to begin.")
+			printIdleStatus(project)
 			return nil
 		}
 
@@ -66,66 +63,103 @@ var statusCmd = &cobra.Command{
 		elapsed := mgr.GetCurrentElapsed(sess)
 
 		// Display session info
-		fmt.Printf("Project: %s\n", project.Name)
-		fmt.Printf("Path: %s\n", project.Path)
-		fmt.Printf("Base Branch: %s\n", project.BaseBranch)
-		fmt.Println()
-
-		// State indicator
-		stateEmoji := "🟢"
-		stateText := "ACTIVE"
-		if sess.State == db.StatePaused {
-			stateEmoji = "🟡"
-			stateText = "PAUSED"
-		}
-
-		fmt.Printf("%s State: %s\n", stateEmoji, stateText)
-		fmt.Printf("🌱 Branch: %s\n", sess.Branch)
-
-		if sess.IssueID != "" {
-			fmt.Printf("🎫 Issue: #%s - %s\n", sess.IssueID, sess.IssueTitle)
-		}
-
-		fmt.Printf("Elapsed: %s\n", formatDuration(elapsed))
-		fmt.Printf("Started: %s\n", sess.StartTime.Format("2006-01-02 15:04:05"))
-
-		if sess.State == db.StatePaused && sess.PauseTime != nil {
-			fmt.Printf("Paused: %s\n", sess.PauseTime.Format("2006-01-02 15:04:05"))
-		}
-
-		fmt.Println()
-
-		if sess.State == db.StateActive {
-			fmt.Println("Next: 'sess pause' to pause, or continue working!")
-		} else {
-			fmt.Println("Next: 'sess resume' to continue working")
-		}
+		printActiveStatus(project, sess, elapsed)
 
 		return nil
 	},
 }
 
-func formatDuration(d interface{}) string {
-	var seconds int64
+// printIdleStatus displays status when no session is active
+func printIdleStatus(project *db.Project) {
+	fmt.Printf("On branch %s\n", project.BaseBranch)
+	fmt.Println("No active session")
+	fmt.Println()
+	fmt.Println("Start a new session with 'sess start'")
+}
 
-	switch v := d.(type) {
-	case int64:
-		seconds = v
-	default:
-		// If it's a time.Duration or something else, try to get seconds
-		return fmt.Sprintf("%v", d)
+// printActiveStatus displays status when a session is active or paused
+func printActiveStatus(project *db.Project, sess *db.Session, elapsed time.Duration) {
+	// First line: branch info (like git)
+	branchDisplay := sess.Branch
+	if sess.BranchType != "" {
+		branchDisplay = fmt.Sprintf("%s (%s)", sess.Branch, sess.BranchType)
+	}
+	fmt.Printf("On branch %s\n", branchDisplay)
+
+	// Second line: session state with key info
+	stateDisplay := "Session active"
+	if sess.State == db.StatePaused {
+		stateDisplay = "Session paused"
+	}
+	fmt.Printf("%s · %s", stateDisplay, formatDuration(elapsed))
+
+	// Add issue info inline if available
+	if sess.IssueID != "" {
+		fmt.Printf(" · #%s", sess.IssueID)
+	}
+	fmt.Println()
+
+	// Third line: timing details
+	fmt.Printf("Started %s", formatRelativeTime(sess.StartTime))
+	if sess.State == db.StatePaused && sess.PauseTime != nil {
+		fmt.Printf(", paused %s", formatRelativeTime(*sess.PauseTime))
+	}
+	fmt.Println()
+
+	// Issue title on separate line if exists (can be long)
+	if sess.IssueTitle != "" {
+		fmt.Println()
+		fmt.Printf("  %s\n", sess.IssueTitle)
 	}
 
+	// Help text
+	fmt.Println()
+	if sess.State == db.StateActive {
+		fmt.Println("  sess pause    Pause the current session")
+		fmt.Println("  sess end      End and save the session")
+	} else {
+		fmt.Println("  sess resume   Resume the paused session")
+		fmt.Println("  sess end      End and save the session")
+	}
+}
+
+// formatDuration formats a time.Duration into a compact human-readable string
+func formatDuration(d time.Duration) string {
+	seconds := int64(d.Seconds())
 	hours := seconds / 3600
 	minutes := (seconds % 3600) / 60
 	secs := seconds % 60
 
 	if hours > 0 {
-		return fmt.Sprintf("%dh %dm %ds", hours, minutes, secs)
+		return fmt.Sprintf("%dh%dm", hours, minutes)
 	} else if minutes > 0 {
-		return fmt.Sprintf("%dm %ds", minutes, secs)
+		return fmt.Sprintf("%dm%ds", minutes, secs)
 	}
 	return fmt.Sprintf("%ds", secs)
+}
+
+// formatRelativeTime formats a timestamp relative to now
+func formatRelativeTime(t time.Time) string {
+	duration := time.Since(t)
+
+	days := int(duration.Hours() / 24)
+	hours := int(duration.Hours())
+	minutes := int(duration.Minutes())
+
+	if days > 1 {
+		return fmt.Sprintf("%d days ago", days)
+	} else if days == 1 {
+		return "yesterday"
+	} else if hours > 1 {
+		return fmt.Sprintf("%d hours ago", hours)
+	} else if hours == 1 {
+		return "1 hour ago"
+	} else if minutes > 1 {
+		return fmt.Sprintf("%d minutes ago", minutes)
+	} else if minutes == 1 {
+		return "1 minute ago"
+	}
+	return "just now"
 }
 
 func init() {

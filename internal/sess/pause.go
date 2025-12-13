@@ -40,9 +40,8 @@ var pauseCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to get project: %w", err)
 		}
-
 		if project == nil {
-			return fmt.Errorf("this directory is not a tracked SESS project. Run 'sess start' first")
+			return fmt.Errorf("not a tracked project. Run 'sess start' first")
 		}
 
 		// Pause session
@@ -54,11 +53,21 @@ var pauseCmd = &cobra.Command{
 		// Calculate elapsed time
 		elapsed := mgr.GetCurrentElapsed(sess)
 
-		fmt.Println("Session paused")
-		fmt.Printf("Branch: %s\n", sess.Branch)
+		// Display pause info in clean format
+		branchDisplay := sess.Branch
+		if sess.BranchType != "" {
+			branchDisplay = fmt.Sprintf("%s (%s)", sess.Branch, sess.BranchType)
+		}
+
+		fmt.Printf("Paused session on %s\n", branchDisplay)
+		if sess.IssueID != "" {
+			fmt.Printf("Issue #%s", sess.IssueID)
+			if sess.IssueTitle != "" {
+				fmt.Printf(" · %s", sess.IssueTitle)
+			}
+			fmt.Println()
+		}
 		fmt.Printf("Total elapsed: %s\n", formatDuration(elapsed))
-		fmt.Println()
-		fmt.Println("Resume anytime with: sess resume")
 
 		return nil
 	},
