@@ -33,7 +33,7 @@
 
 2. **Install dependencies**
    ```bash
-   go mod download
+   go mod tidy
    ```
 
 3. **Build the project**
@@ -50,7 +50,6 @@
 
 **Recommended:**
 - **VS Code** with Go extension
-- **golangci-lint** - `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
 - **gopls** - Go language server (usually auto-installed by VS Code)
 
 **Optional:**
@@ -160,9 +159,8 @@ Create `internal/sess/pause.go`:
 package sess
 
 import (
-    "github.com/charmbracelet/fang"
     "github.com/spf13/cobra"
-    "sess-cli/internal/tui"
+    "github.com/Orctatech-Engineering-Team/Sess/internal/tui"
 )
 
 var pauseCmd = &cobra.Command{
@@ -175,7 +173,7 @@ var pauseCmd = &cobra.Command{
 }
 
 func init() {
-    rootCmd.AddCommand(fang.Command(pauseCmd))
+    rootCmd.AddCommand(pauseCmd)
 }
 ```
 
