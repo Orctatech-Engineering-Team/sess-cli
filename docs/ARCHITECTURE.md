@@ -102,9 +102,9 @@ The codebase follows hexagonal architecture principles:
 ```
 ┌─────────────────────────────────────────────┐
 │           Adapters (Input)                  │
-│  ┌─────────────┐     ┌──────────────┐       │
-│  │ CLI (Cobra) │────▶│ TUI (Bubble) │       │
-│  └─────────────┘     └──────────────┘       │
+│  ┌─────────────┐      ┌──────────────┐      │
+│  │ CLI (Cobra) │────▶ │TUI (Bubble)  │     │
+│  └─────────────┘      └──────────────┘      │
 └─────────────────────┬───────────────────────┘
                       │
          ┌────────────▼────────────┐
@@ -368,6 +368,7 @@ CREATE TABLE sessions (
     start_time DATETIME NOT NULL,
     pause_time DATETIME,
     end_time DATETIME,
+    current_slice_start DATETIME,
     total_elapsed INTEGER NOT NULL DEFAULT 0,
     branch_type TEXT,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -478,9 +479,9 @@ type Issue struct {
 ### Complete "sess start" Flow
 
 ```
-User runs: sess start
-    │
-    ▼
+        User runs: sess start
+                │
+                ▼
 ┌─────────────────────────────────────────────┐
 │ Cobra Command Handler                       │
 │ internal/sess/start.go:startCmd.RunE        │
@@ -675,7 +676,7 @@ func (m *Model) Resume() { /* ... */ }
 func (m *Model) End() { /* ... */ }
 ```
 
-**Current Status (MVP1):** Fully integrated with database persistence
+**Current Status (MVP - 1):** Fully integrated with database persistence
 
 **Migration Note:** The session model in TUI layer is now complemented by database persistence via `internal/db` and `internal/session` packages. Time tracking is now persistent and survives across command invocations.
 
@@ -947,10 +948,9 @@ db, err := sql.Open("sqlite", "~/.sess-cli/sess.db")
    - User preferences (default branch type, base branch)
    - Per-repo settings
 
-2. **State Persistence** ✅ **COMPLETED IN MVP1**
+2. **State Persistence** **COMPLETED IN MVP1**
    - ✅ Session history storage (SQLite)
    - ✅ Time tracking database
-   - 🔄 Analytics and insights (basic in MVP1, can expand)
 
 3. **Plugin System**
    - Custom branch naming strategies
