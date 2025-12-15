@@ -70,24 +70,6 @@ func streamStep(p *tea.Program, dir string, args []string, next func()) {
 	}()
 }
 
-// Example usage in your Bubble Tea model:
-//
-// func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-//     switch msg := msg.(type) {
-//     case gitLineMsg:
-//         m.logs = append(m.logs, string(msg))
-//     case gitErrLineMsg:
-//         m.logs = append(m.logs, "[stderr] "+string(msg))
-//     case gitErrMsg:
-//         m.error = msg.error
-//         m.running = false
-//     case gitSuccessMsg:
-//         m.running = false
-//         m.success = true
-//     }
-//     return m, nil
-// }
-
 func streamStepSimple(p *tea.Program, dir string, args []string, next func()) {
 	ctx := context.Background()
 	channels := git.RunGitWithOutput(ctx, dir, args...)
