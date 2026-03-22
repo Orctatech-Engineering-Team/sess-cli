@@ -221,9 +221,9 @@ sess end
 | `sess pause` | ✅ **MVP1** | Pause current session and stop time tracking |
 | `sess resume` | ✅ **MVP1** | Resume paused session and continue time tracking |
 | `sess projects` | ✅ **MVP1** | List all tracked projects across the system |
-| `sess end` | 🚧 Phase 3 | End session, commit, push, open PR |
-| `sess auth` | 🚧 Phase 4 | Authenticate with GitHub (currently uses `gh` auth) |
-| `sess config` | 🚧 Phase 4 | Initialize CLI in repo with custom settings |
+| `sess end` | 🚧 [Phase 3 — #3](../../issues/3) | End session, commit, push, open PR |
+| `sess auth` | 🚧 [Phase 4 — #6](../../issues/6) | Authenticate with GitHub (currently uses `gh` auth) |
+| `sess config` | 🚧 [Phase 4 — #7](../../issues/7) | Initialize CLI in repo with custom settings |
 
 ---
 
@@ -278,7 +278,7 @@ sess end
 
 **Goal:** Complete the session lifecycle from start to PR
 
-- [ ] **`sess end` Command**
+- [ ] **`sess end` Command** — [Issue #3](../../issues/3)
   - [ ] Interactive PR description input (use PR template if exists)
   - [ ] Commit all changes with user message
   - [ ] Rebase onto base branch (`dev`)
@@ -290,7 +290,7 @@ sess end
   - [ ] Mark session as ended
   - [ ] Show session summary (duration, commits, PR link)
 
-- [ ] **Conflict Handling**
+- [ ] **Conflict Handling** — [Issue #4](../../issues/4)
   - [ ] Detect rebase conflicts
   - [ ] Pause workflow, provide resolution instructions
   - [ ] Resume PR creation after resolution
@@ -299,12 +299,12 @@ sess end
 
 **Goal:** Flexible setup and secure authentication
 
-- [ ] **`auth login` Command**
+- [ ] **`auth login` Command** — [Issue #6](../../issues/6)
   - [ ] GitHub OAuth flow
   - [ ] Store token securely (OS keychain or encrypted config)
   - [ ] Fallback to `gh` CLI authentication
 
-- [ ] **`config init` Command**
+- [ ] **`config init` Command** — [Issue #7](../../issues/7)
   - [ ] Interactive setup wizard
   - [ ] Configure: organization, default base branch, branch naming
   - [ ] Store in `.sess-cli/config.json`
@@ -324,7 +324,7 @@ sess end
   - [x] Track: duration, issue, branch, state
   - [ ] Track: commits, PR link (Phase 3)
 
-- [ ] **Analytics Commands**
+- [ ] **Analytics Commands** — [Issue #8](../../issues/8)
   - [ ] `sess history` - Show recent sessions
   - [ ] `sess stats` - Time spent per issue, average session length
   - [ ] `sess report` - Weekly/monthly productivity insights
