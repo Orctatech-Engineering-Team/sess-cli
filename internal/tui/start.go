@@ -340,12 +340,12 @@ func (m startModel) View() string {
 }
 
 // runStart orchestrates checkout base branch → pull → create branch with live logs
-func runStart(p *tea.Program, baseBranch, branchType, branchName string) {
-	streamStep(p, ".", []string{"checkout", baseBranch}, func() {
-		streamStep(p, ".", []string{"pull", "origin", baseBranch}, func() {
+func runStart(p *tea.Program, dir, baseBranch, branchType, branchName string) {
+	streamStep(p, dir, []string{"checkout", baseBranch}, func() {
+		streamStep(p, dir, []string{"pull", "origin", baseBranch}, func() {
 			safe := sanitizeBranchName(branchName)
 			fullBranch := branchType + "/" + safe
-			streamStep(p, ".", []string{"checkout", "-b", fullBranch}, func() {
+			streamStep(p, dir, []string{"checkout", "-b", fullBranch}, func() {
 				p.Send(gitSuccessMsg{})
 			})
 		})
@@ -371,14 +371,9 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 		return fmt.Errorf("not a git repository")
 	}
 
-	// Initialize or get project (default base branch is "dev")
-	project, err := mgr.InitializeProject(cwd, "dev")
+	project, baseBranch, err := resolveStartProject(ctx, mgr, database, cwd)
 	if err != nil {
-		return fmt.Errorf("failed to initialize project: %w", err)
-	}
-	baseBranch := project.BaseBranch
-	if baseBranch == "" {
-		baseBranch = "dev"
+		return err
 	}
 
 	// Check if there's already an active session
@@ -456,7 +451,7 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	}
 
 	// 4. Check if repo is dirty
-	dirty, err := git.IsDirty(ctx, ".")
+	dirty, err := git.IsDirty(ctx, cwd)
 	if err != nil {
 		return err
 	}
@@ -479,17 +474,17 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 		if p, ok := final.(promptModel); ok {
 			switch p.choice {
 			case choiceStash:
-				_, err = git.RunCombined(ctx, ".", "stash", "push", "-u")
+				_, err = git.RunCombined(ctx, cwd, "stash", "push", "-u")
 			case choiceCommit:
-				_, err = git.RunCombined(ctx, ".", "add", "-A")
+				_, err = git.RunCombined(ctx, cwd, "add", "-A")
 				if err == nil {
 					// Open Git editor for commit message
-					_, err = git.RunCombined(ctx, ".", "commit")
+					_, err = git.RunCombined(ctx, cwd, "commit")
 				}
 			case choiceDiscard:
-				_, err = git.RunCombined(ctx, ".", "reset", "--hard")
+				_, err = git.RunCombined(ctx, cwd, "reset", "--hard")
 				if err == nil {
-					_, err = git.RunCombined(ctx, ".", "clean", "-fd")
+					_, err = git.RunCombined(ctx, cwd, "clean", "-fd")
 				}
 			case choiceQuit:
 				return nil
@@ -508,7 +503,7 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	}
 
 	p := tea.NewProgram(newStartModel(fullBranch))
-	go runStart(p, baseBranch, branchType, branchName) // start git orchestration in background
+	go runStart(p, cwd, baseBranch, branchType, branchName) // start git orchestration in background
 	finalModel, err := p.Run()
 	if err != nil {
 		return err
@@ -543,4 +538,50 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	}
 
 	return nil
+}
+
+func resolveStartProject(ctx context.Context, mgr *session.Manager, database *db.DB, cwd string) (*db.Project, string, error) {
+	detectedBaseBranch, err := git.DetectBaseBranch(ctx, cwd)
+	if err != nil {
+		detectedBaseBranch = "dev"
+	}
+
+	project, err := mgr.InitializeProject(cwd, detectedBaseBranch)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to initialize project: %w", err)
+	}
+
+	baseBranch := strings.TrimSpace(project.BaseBranch)
+	if baseBranch == "" {
+		baseBranch = detectedBaseBranch
+	}
+
+	baseBranchExists, err := git.BranchExists(ctx, cwd, baseBranch)
+	if err != nil {
+		return nil, "", fmt.Errorf("check tracked base branch %q: %w", baseBranch, err)
+	}
+
+	if baseBranchExists {
+		return project, baseBranch, nil
+	}
+
+	if detectedBaseBranch == "" {
+		return nil, "", fmt.Errorf("tracked base branch %q does not exist locally or on origin", baseBranch)
+	}
+
+	detectedBaseBranchExists, err := git.BranchExists(ctx, cwd, detectedBaseBranch)
+	if err != nil {
+		return nil, "", fmt.Errorf("check detected base branch %q: %w", detectedBaseBranch, err)
+	}
+	if !detectedBaseBranchExists {
+		return nil, "", fmt.Errorf("tracked base branch %q does not exist locally or on origin", baseBranch)
+	}
+
+	project.BaseBranch = detectedBaseBranch
+	project.LastUsedAt = time.Now()
+	if err := database.UpdateProject(project); err != nil {
+		return nil, "", fmt.Errorf("repair project base branch: %w", err)
+	}
+
+	return project, detectedBaseBranch, nil
 }

@@ -75,7 +75,7 @@ SESS uses it when:
 - rebasing during `sess end`
 - switching back after a successful session end
 
-If no base branch is already stored, the default is `dev`.
+If no base branch is already stored, SESS detects it from `origin/HEAD` and falls back to the current branch when the remote default branch is unavailable.
 
 ## GitHub Metadata
 

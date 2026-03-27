@@ -363,6 +363,53 @@ func CurrentBranch(ctx context.Context, dir string) (string, error) {
 	return branch, nil
 }
 
+// DetectBaseBranch returns the preferred base branch for the repository.
+// It prefers the remote default branch from origin/HEAD and falls back to the
+// current branch when the remote default branch is unavailable.
+func DetectBaseBranch(ctx context.Context, dir string) (string, error) {
+	remoteHead, err := symbolicRef(ctx, dir, "refs/remotes/origin/HEAD")
+	if err != nil {
+		return "", fmt.Errorf("detect remote default branch: %w", err)
+	}
+	if remoteHead != "" {
+		return strings.TrimPrefix(remoteHead, "origin/"), nil
+	}
+
+	branch, err := CurrentBranch(ctx, dir)
+	if err != nil {
+		return "", fmt.Errorf("detect current branch: %w", err)
+	}
+	if branch == "" || branch == "HEAD" {
+		return "", fmt.Errorf("base branch could not be determined")
+	}
+
+	return branch, nil
+}
+
+// BranchExists reports whether the branch exists locally or on origin.
+func BranchExists(ctx context.Context, dir, branch string) (bool, error) {
+	if branch == "" {
+		return false, nil
+	}
+
+	refs := []string{
+		"refs/heads/" + branch,
+		"refs/remotes/origin/" + branch,
+	}
+
+	for _, ref := range refs {
+		exists, err := refExists(ctx, dir, ref)
+		if err != nil {
+			return false, fmt.Errorf("check ref %s: %w", ref, err)
+		}
+		if exists {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // Add runs `git add <paths...>`
 func Add(ctx context.Context, dir string, paths ...string) error {
 	args := append([]string{"add"}, paths...)
@@ -517,6 +564,59 @@ func Show(ctx context.Context, dir, ref string) (string, error) {
 		return "", fmt.Errorf("git show failed: %w", err)
 	}
 	return out, nil
+}
+
+func symbolicRef(ctx context.Context, dir, ref string) (string, error) {
+	cmd, cancel := gitCommand(ctx, dir, "symbolic-ref", "--quiet", "--short", ref)
+	defer cancel()
+
+	var outBuf bytes.Buffer
+	var errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+
+	err := cmd.Run()
+	if err == nil {
+		return strings.TrimSpace(outBuf.String()), nil
+	}
+
+	if _, ok := err.(*exec.ExitError); ok {
+		return "", nil
+	}
+
+	stderr := strings.TrimSpace(errBuf.String())
+	if stderr != "" {
+		return "", fmt.Errorf("%w: %s", err, stderr)
+	}
+	return "", err
+}
+
+func refExists(ctx context.Context, dir, ref string) (bool, error) {
+	cmd, cancel := gitCommand(ctx, dir, "show-ref", "--verify", "--quiet", ref)
+	defer cancel()
+
+	if err := cmd.Run(); err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
+func gitCommand(ctx context.Context, dir string, args ...string) (*exec.Cmd, context.CancelFunc) {
+	cancel := func() {}
+	if _, ok := ctx.Deadline(); !ok {
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	}
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+
+	return cmd, cancel
 }
 
 // GetRootDir returns the root directory of the git repository
