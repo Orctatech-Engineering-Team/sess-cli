@@ -32,7 +32,7 @@ curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/lates
 Install a specific version:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.3.0 bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.3.1 bash
 ```
 
 Manual install example:
@@ -82,7 +82,7 @@ Typical workflow:
 1. Run `sess start` and select an issue or provide a feature name.
 2. Work on the created branch.
 3. Use `sess pause` and `sess resume` when interrupted.
-4. Run `sess end` to commit dirty work if needed, rebase, push, create or reuse a PR, and return to the base branch.
+4. Run `sess end` to commit dirty work if needed, rebase onto the tracked base branch, push, create or reuse a PR, and return to that base branch.
 
 ## Commands
 
@@ -155,4 +155,4 @@ sudo install -m 0755 sess /usr/local/bin/sess
 ## Releases
 
 - [Latest release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest)
-- [v0.3.0 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.3.0)
+- [v0.3.1 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.3.1)

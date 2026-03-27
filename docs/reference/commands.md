@@ -24,8 +24,11 @@ sess start user-profile-page
 
 - fails if the current directory is not a git repository
 - fails if the project already has an active or paused session
+- detects the base branch from `origin/HEAD` and falls back to the current branch when needed
+- repairs an invalid stored base branch before branch creation
 - optionally loads GitHub issues through `gh`
 - prompts for dirty working tree handling before branch creation
+- checks out and pulls the tracked base branch before creating the session branch
 - creates a new active session in the local SQLite database
 
 ## `sess status`
@@ -40,6 +43,7 @@ sess status
 
 ### Behavior
 
+- prints a guidance message when the current directory is not a tracked project
 - prints idle state when the project is tracked but has no active or paused session
 - prints active or paused session details when a session exists
 - includes elapsed time and linked issue information when available
@@ -57,6 +61,7 @@ sess pause
 ### Behavior
 
 - only works when the project has an active session
+- fails if the current directory is not a tracked project
 - stops active time accumulation
 - preserves the branch and issue context in the database
 
@@ -73,6 +78,7 @@ sess resume
 ### Behavior
 
 - only works when the project has a paused session
+- fails if the current directory is not a tracked project
 - checks out the saved session branch first if the shell is on a different branch
 - fails closed if branch checkout fails
 - resumes time tracking only after branch alignment succeeds
@@ -90,6 +96,7 @@ sess end
 ### Behavior
 
 - works for active and paused sessions
+- fails if the current directory is not a tracked project
 - checks out the saved session branch first when needed
 - prompts for a commit message when the working tree is dirty
 - checks whether there is shippable work on the branch
@@ -133,5 +140,5 @@ sess --version
 
 The version output is formatted as:
 
-- tagged release, for example `SESS v0.3.0`
+- tagged release, for example `SESS v0.3.1`
 - development build, for example `SESS dev-abc1234`

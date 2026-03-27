@@ -1,8 +1,46 @@
 # Architecture
 
-This document describes the current SESS architecture at `v0.3.0`.
+This document describes the current SESS architecture at `v0.3.1`.
 
-SESS is a Go CLI that manages developer work as explicit sessions tied to repositories, branches, optional GitHub issues, and eventually pull requests.
+SESS is a Go CLI that manages developer work as explicit sessions tied to repositories, branches, optional GitHub issues, and pull requests.
+
+## System Diagram
+
+```text
++---------------------------+         +-----------------------------+
+| User shell / working repo |         | GitHub + origin remote      |
+| current branch, worktree  |         | issues, PRs, default branch |
++-------------+-------------+         +--------------+--------------+
+              |                                          ^
+              v                                          |
++-------------+------------------------------------------+---------+
+|                           SESS binary                            |
+|                                                                  |
+|  +------------------+                                            |
+|  | cmd/sess         | entrypoint                                 |
+|  +--------+---------+                                            |
+|           |                                                      |
+|  +--------v---------+                                            |
+|  | internal/sess    | Cobra/Fang command layer                   |
+|  +-----+-------+----+                                            |
+|        |       |                                                 |
+|        |       +------------------------+                        |
+|        v                                v                        |
+|  +-----+-----------+          +---------+----------+             |
+|  | internal/tui    | <------> | internal/session   |             |
+|  | Bubble Tea UX   |          | lifecycle rules    |             |
+|  +-----+-------+---+          +---------+----------+             |
+|        |       |                         |                        |
+|        |       +-------------+           |                        |
+|        v                     v           v                        |
+|  +-----+----------+   +------+-------+  +----------------------+  |
+|  | internal/git   |   | internal/db  |  | SQLite               |  |
+|  | git / gh wraps |   | persistence  |  | ~/.sess-cli/sess.db  |  |
+|  +-----+----------+   +------+-------+  +----------------------+  |
++--------+----------------------+-----------------------------------+
+         |
+         +--> `git` and `gh` commands run against the local repo and GitHub
+```
 
 ## Overview
 
@@ -20,11 +58,19 @@ cmd/sess
 Each layer has a distinct responsibility:
 
 - `cmd/sess`: application entrypoint
-- `internal/sess`: Cobra/Fang command wiring
-- `internal/tui`: interactive workflows and Bubble Tea models
+- `internal/sess`: Cobra/Fang command wiring, current working directory lookup, and database bootstrap
+- `internal/tui`: interactive workflows and Bubble Tea models for `start` and `end`
 - `internal/session`: lifecycle rules for projects and sessions
 - `internal/db`: SQLite schema and persistence
 - `internal/git`: wrappers around `git` and `gh`
+
+In practice:
+
+- thin commands in `internal/sess` usually open the database and then hand control to either:
+  - a TUI flow in `internal/tui`, or
+  - a small command path that uses `internal/session` and `internal/git` directly
+- `internal/tui` is orchestration-heavy: it coordinates prompts, git operations, and session persistence
+- `internal/session` owns state transitions such as `active -> paused -> active -> ended`
 
 ## Project Structure
 
@@ -67,6 +113,20 @@ SESS tracks two core concepts:
 - `Project`: a tracked repository on disk
 - `Session`: a unit of work inside a project
 
+A tracked project stores:
+
+- repository path
+- base branch
+- last-used timestamp
+
+A session stores:
+
+- branch and branch type
+- optional issue metadata
+- state
+- elapsed-time bookkeeping
+- optional PR metadata once ended
+
 Session states:
 
 - `active`
@@ -81,10 +141,15 @@ Only one active or paused session may exist per project at a time.
 
 1. Command resolves the current working directory and opens SQLite.
 2. TUI validates that the directory is a git repository.
-3. Session manager initializes or loads the tracked project.
-4. TUI collects issue, branch name, branch type, and dirty-worktree choices.
-5. Git wrappers create the session branch from the tracked base branch.
-6. Session manager persists the new active session.
+3. TUI detects the project base branch from `origin/HEAD`, with fallback to the current branch.
+4. Session manager initializes or loads the tracked project.
+5. If the stored base branch is invalid, the TUI repairs it before continuing.
+6. TUI collects issue, branch name, branch type, and dirty-worktree choices.
+7. Git wrappers:
+   - check out the tracked base branch
+   - pull `origin/<baseBranch>`
+   - create the new session branch
+8. Session manager persists the new active session.
 
 ### `sess resume`
 
@@ -123,6 +188,13 @@ Main persisted data:
 - linked issue metadata
 - PR number and PR URL for ended sessions
 
+The current schema is centered on two tables:
+
+- `projects`
+- `sessions`
+
+`sessions.total_elapsed` and `sessions.current_slice_start` are used together so pause and resume can accumulate time accurately across multiple active slices.
+
 ## Design Constraints
 
 The current design prefers:
@@ -156,11 +228,12 @@ Why:
 
 - interactive session flows are stateful and easier to express in Bubble Tea
 - command files stay thin
-- lifecycle rules can still live below the TUI in `internal/session`
+- lifecycle rules still live below the TUI in `internal/session`
+- git and GitHub side effects stay concentrated in one orchestration layer
 
 ## Current Gaps
 
-The main architectural follow-up after `v0.3.0` is conflict and interrupted-workflow recovery for `sess end`.
+The main architectural follow-up after `v0.3.1` is conflict and interrupted-workflow recovery for `sess end`.
 
 See:
 
