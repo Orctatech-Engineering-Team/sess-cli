@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${SESS_REPO:-Orctatech-Engineering-Team/Sess}"
+REPO="${SESS_REPO:-Orctatech-Engineering-Team/sess-cli}"
 BIN_NAME="sess"
 INSTALL_DIR="${SESS_INSTALL_DIR:-/usr/local/bin}"
 VERSION="${SESS_VERSION:-latest}"

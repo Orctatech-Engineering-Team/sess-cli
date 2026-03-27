@@ -94,7 +94,7 @@ Session started! Happy coding.
 Install the latest release with:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo bash
 ```
 
 This installs `sess` to `/usr/local/bin/sess`.
@@ -103,20 +103,20 @@ The installer supports Linux and macOS.
 To install into `/usr/bin` instead:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
 ```
 
 To install a specific release:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.2.1 bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.2.1 bash
 ```
 
 ### Manual Binary Install
 
 ```bash
 # Example: Linux amd64
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
 sudo install -m 0755 sess /usr/local/bin/sess
 ```
 

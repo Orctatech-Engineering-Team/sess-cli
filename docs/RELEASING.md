@@ -56,7 +56,7 @@ git push origin v0.2.0
 
 ### 4. Monitor the Release
 
-1. Go to **Actions** tab in GitHub: `https://github.com/Orctatech-Engineering-Team/Sess/actions`
+1. Go to **Actions** tab in GitHub: `https://github.com/Orctatech-Engineering-Team/sess-cli/actions`
 2. Click on the "Release" workflow run
 3. Watch the build process (~3-5 minutes)
 
@@ -64,7 +64,7 @@ git push origin v0.2.0
 
 Once complete:
 
-1. Go to **Releases**: `https://github.com/Orctatech-Engineering-Team/Sess/releases`
+1. Go to **Releases**: `https://github.com/Orctatech-Engineering-Team/sess-cli/releases`
 2. Verify all 6 binaries are present:
    - `sess-linux-amd64.tar.gz`
    - `sess-linux-arm64.tar.gz`
@@ -82,7 +82,7 @@ Download and test the binary for your platform:
 
 ```bash
 # Example for Linux/macOS
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/download/v0.2.0/install.sh | sudo bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v0.2.0/install.sh | sudo bash
 sess --version
 # Should output: SESS v0.2.0
 ```
@@ -237,7 +237,7 @@ After a release, users can install with:
 ### Linux/macOS (recommended)
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo bash
 ```
 
 This installs to `/usr/local/bin/sess` by default.
@@ -246,19 +246,19 @@ The installer supports Linux and macOS.
 To install into `/usr/bin` instead:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
 ```
 
 To install a specific version:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.2.0 bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.2.0 bash
 ```
 
 ### Linux/macOS (manual archive install)
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
 sudo install -m 0755 sess /usr/local/bin/sess
 ```
 
@@ -275,7 +275,7 @@ brew install sess
 
 ```powershell
 $version = "0.2.0"
-Invoke-WebRequest -Uri "https://github.com/Orctatech-Engineering-Team/Sess/releases/download/v$version/sess-windows-amd64.zip" -OutFile "sess.zip"
+Invoke-WebRequest -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v$version/sess-windows-amd64.zip" -OutFile "sess.zip"
 Expand-Archive sess.zip -DestinationPath $env:USERPROFILE\bin
 # Add $env:USERPROFILE\bin to PATH
 ```
@@ -293,7 +293,7 @@ Users should verify downloads using checksums:
 
 ```bash
 # Download checksum file
-curl -L https://github.com/Orctatech-Engineering-Team/Sess/releases/download/v0.2.0/checksums.txt -o checksums.txt
+curl -L https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v0.2.0/checksums.txt -o checksums.txt
 
 # Verify (Linux/macOS)
 sha256sum -c checksums.txt --ignore-missing
