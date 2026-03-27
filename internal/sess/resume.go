@@ -61,13 +61,14 @@ var resumeCmd = &cobra.Command{
 		// Check if we need to checkout the branch
 		ctx := context.Background()
 		currentBranch, err := git.CurrentBranch(ctx, cwd)
-		if err == nil && currentBranch != sess.Branch {
+		if err != nil {
+			return fmt.Errorf("determine current branch before resuming: %w", err)
+		}
+		if currentBranch != sess.Branch {
 			fmt.Printf("Switching to branch %s...", sess.Branch)
 			if err := git.Checkout(ctx, cwd, sess.Branch); err != nil {
 				fmt.Println(" failed")
-				fmt.Printf("Warning: could not checkout branch: %v\n", err)
-				fmt.Println("You may need to switch branches manually.")
-				fmt.Println()
+				return fmt.Errorf("switch to session branch %s before resuming: %w", sess.Branch, err)
 			} else {
 				fmt.Println(" done")
 			}

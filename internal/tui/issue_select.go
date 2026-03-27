@@ -17,7 +17,7 @@ type issueItem struct {
 }
 
 func (i issueItem) FilterValue() string { return i.issue.Title }
-func (i issueItem) Title() string       { return fmt.Sprintf("#%s: %s", i.issue.ID, i.issue.Title) }
+func (i issueItem) Title() string       { return fmt.Sprintf("#%d: %s", i.issue.Number, i.issue.Title) }
 func (i issueItem) Description() string { return i.issue.URL }
 
 // issuesLoadedMsg is sent when issues are successfully loaded
@@ -150,7 +150,7 @@ func (m issueSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m issueSelectModel) View() string {
 	if m.done {
 		if m.selected != nil {
-			return fmt.Sprintf("Selected issue #%s: %s\n", m.selected.ID, m.selected.Title)
+			return fmt.Sprintf("Selected issue #%d: %s\n", m.selected.Number, m.selected.Title)
 		}
 		return "Starting without an issue\n"
 	}

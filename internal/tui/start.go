@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -303,6 +304,8 @@ func (m startModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case gitLineMsg:
 		m.logs = append(m.logs, string(msg))
+	case gitErrLineMsg:
+		m.logs = append(m.logs, "[stderr] "+string(msg))
 	case gitErrMsg:
 		m.err = msg
 		m.done = true
@@ -336,10 +339,10 @@ func (m startModel) View() string {
 	return s
 }
 
-// runStart orchestrates checkout dev → pull → create branch with live logs
-func runStart(p *tea.Program, branchType, branchName string) {
-	streamStep(p, ".", []string{"checkout", "dev"}, func() {
-		streamStep(p, ".", []string{"pull", "origin", "dev"}, func() {
+// runStart orchestrates checkout base branch → pull → create branch with live logs
+func runStart(p *tea.Program, baseBranch, branchType, branchName string) {
+	streamStep(p, ".", []string{"checkout", baseBranch}, func() {
+		streamStep(p, ".", []string{"pull", "origin", baseBranch}, func() {
 			safe := sanitizeBranchName(branchName)
 			fullBranch := branchType + "/" + safe
 			streamStep(p, ".", []string{"checkout", "-b", fullBranch}, func() {
@@ -358,10 +361,24 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	// Create session manager
 	mgr := session.NewManager(database)
 
+	// Fail before creating a tracked project when the current directory is not a git repo.
+	ctx := context.Background()
+	isRepo, err := git.IsRepo(ctx, cwd)
+	if err != nil {
+		return fmt.Errorf("check git repository state: %w", err)
+	}
+	if !isRepo {
+		return fmt.Errorf("not a git repository")
+	}
+
 	// Initialize or get project (default base branch is "dev")
 	project, err := mgr.InitializeProject(cwd, "dev")
 	if err != nil {
 		return fmt.Errorf("failed to initialize project: %w", err)
+	}
+	baseBranch := project.BaseBranch
+	if baseBranch == "" {
+		baseBranch = "dev"
 	}
 
 	// Check if there's already an active session
@@ -439,7 +456,6 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	}
 
 	// 4. Check if repo is dirty
-	ctx := context.Background()
 	dirty, err := git.IsDirty(ctx, ".")
 	if err != nil {
 		return err
@@ -472,6 +488,9 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 				}
 			case choiceDiscard:
 				_, err = git.RunCombined(ctx, ".", "reset", "--hard")
+				if err == nil {
+					_, err = git.RunCombined(ctx, ".", "clean", "-fd")
+				}
 			case choiceQuit:
 				return nil
 			}
@@ -484,12 +503,12 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	// 5. Run main start model with live logs
 	fullBranch := branchType + "/" + sanitizeBranchName(branchName)
 	if selectedIssue != nil {
-		fmt.Printf("Starting session for issue %s: %s\n", selectedIssue.ID, selectedIssue.Title)
+		fmt.Printf("Starting session for issue #%d: %s\n", selectedIssue.Number, selectedIssue.Title)
 		fmt.Printf("Branch: %s\n\n", fullBranch)
 	}
 
 	p := tea.NewProgram(newStartModel(fullBranch))
-	go runStart(p, branchType, branchName) // start git orchestration in background
+	go runStart(p, baseBranch, branchType, branchName) // start git orchestration in background
 	finalModel, err := p.Run()
 	if err != nil {
 		return err
@@ -506,7 +525,7 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	issueID := ""
 	issueTitle := ""
 	if selectedIssue != nil {
-		issueID = selectedIssue.ID
+		issueID = strconv.Itoa(selectedIssue.Number)
 		issueTitle = selectedIssue.Title
 	}
 
@@ -514,12 +533,13 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	if err != nil {
 		// Session creation failed, but git operations succeeded
 		// Print warning but don't fail
-		fmt.Printf("\n  Warning: Failed to save session to database: %v\n", err)
-		fmt.Println("Your branch was created successfully, but session tracking is unavailable.")
+		fmt.Printf("\nWarning: failed to save session: %v\n", err)
+		fmt.Println("Branch created, but session tracking is unavailable.")
 	} else {
-		fmt.Println("\n✅ Session started and saved!")
-		fmt.Println(" Use 'sess status' to view session details")
-		fmt.Println(" Use 'sess pause' to pause when you need a break")
+		fmt.Printf("\nStarted session on %s (%s)\n", fullBranch, branchType)
+		if issueID != "" {
+			fmt.Printf("Issue #%s · %s\n", issueID, issueTitle)
+		}
 	}
 
 	return nil

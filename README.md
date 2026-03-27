@@ -89,6 +89,37 @@ Session started! Happy coding.
 
 ## Installation
 
+### Quick Install
+
+Install the latest release with:
+
+```bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo bash
+```
+
+This installs `sess` to `/usr/local/bin/sess`.
+The installer supports Linux and macOS.
+
+To install into `/usr/bin` instead:
+
+```bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
+```
+
+To install a specific release:
+
+```bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.2.1 bash
+```
+
+### Manual Binary Install
+
+```bash
+# Example: Linux amd64
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
+sudo install -m 0755 sess /usr/local/bin/sess
+```
+
 ### From Source
 
 ```bash
@@ -100,14 +131,23 @@ cd sess-cli
 go build -o sess ./cmd/sess
 
 # Move to PATH (optional)
-sudo mv sess /usr/local/bin/
+sudo install -m 0755 sess /usr/local/bin/sess
 ```
 
-### Prerequisites
+### Runtime Prerequisites
 
 - **Git** - [Install Git](https://git-scm.com/downloads)
 - **GitHub CLI (gh)** - [Install gh](https://cli.github.com/)
+
+### Build Prerequisites
+
 - **Go 1.25+** (for building from source)
+
+Verify the install with:
+
+```bash
+sess --version
+```
 
 ---
 

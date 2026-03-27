@@ -7,8 +7,9 @@ SESS uses GitHub Actions to automatically build and release binaries for multipl
 1. Builds binaries for 6 platforms (Linux, macOS, Windows - amd64 & arm64)
 2. Creates compressed archives (.tar.gz for Unix, .zip for Windows)
 3. Generates SHA256 checksums
-4. Creates a GitHub Release with all artifacts
-5. Includes installation instructions in the release notes
+4. Publishes an `install.sh` asset for one-line installs
+5. Creates a GitHub Release with all artifacts
+6. Includes installation instructions in the release notes
 
 ## Supported Platforms
 
@@ -72,16 +73,17 @@ Once complete:
    - `sess-windows-amd64.zip`
    - `sess-windows-arm64.zip`
 3. Verify `checksums.txt` is present
-4. Check that release notes are generated
+4. Verify `install.sh` is present
+5. Check that release notes are generated
 
 ### 6. Test the Release
 
 Download and test the binary for your platform:
 
 ```bash
-# Example for Linux amd64
-curl -L https://github.com/Orctatech-Engineering-Team/Sess/releases/download/v0.2.0/sess-linux-amd64.tar.gz | tar xz
-./sess-linux-amd64 --version
+# Example for Linux/macOS
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/download/v0.2.0/install.sh | sudo bash
+sess --version
 # Should output: SESS v0.2.0
 ```
 
@@ -175,7 +177,8 @@ Triggers on: Push to tags matching `v*.*.*`
 3. Build binaries for all platforms
 4. Create archives (.tar.gz/.zip)
 5. Generate SHA256 checksums
-6. Create GitHub Release with artifacts
+6. Attach `install.sh` alongside release artifacts
+7. Create GitHub Release with artifacts
 
 **Build flags:**
 
@@ -210,14 +213,14 @@ git checkout v0.2.0
 # Build for a specific platform
 GOOS=linux GOARCH=amd64 go build \
   -ldflags="-s -w" \
-  -o sess-linux-amd64 \
+  -o sess \
   ./cmd/sess
 
 # Verify version
-./sess-linux-amd64 --version
+./sess --version
 
 # Create archive
-tar czf sess-linux-amd64.tar.gz sess-linux-amd64
+tar czf sess-linux-amd64.tar.gz sess
 
 # Generate checksum
 sha256sum sess-linux-amd64.tar.gz > checksums.txt
@@ -231,16 +234,32 @@ Then manually create the release on GitHub and upload the files.
 
 After a release, users can install with:
 
-### Linux/macOS (via curl)
+### Linux/macOS (recommended)
 
 ```bash
-# Linux amd64
-curl -L https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
-sudo mv sess-linux-amd64 /usr/local/bin/sess
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo bash
+```
 
-# macOS Apple Silicon
-curl -L https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/sess-darwin-arm64.tar.gz | tar xz
-sudo mv sess-darwin-arm64 /usr/local/bin/sess
+This installs to `/usr/local/bin/sess` by default.
+The installer supports Linux and macOS.
+
+To install into `/usr/bin` instead:
+
+```bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
+```
+
+To install a specific version:
+
+```bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.2.0 bash
+```
+
+### Linux/macOS (manual archive install)
+
+```bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/Sess/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
+sudo install -m 0755 sess /usr/local/bin/sess
 ```
 
 ### Homebrew (Future)

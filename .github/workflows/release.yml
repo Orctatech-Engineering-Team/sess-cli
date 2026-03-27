@@ -78,6 +78,10 @@ jobs:
           sha256sum * > checksums.txt
           cat checksums.txt
 
+      - name: Prepare installer asset
+        run: |
+          cp scripts/install.sh dist/install.sh
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -85,35 +89,40 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/checksums.txt
+            dist/install.sh
           draft: false
           prerelease: false
           generate_release_notes: true
           body: |
             ## Installation
 
-            ### Linux (amd64)
+            ### Quick Install
             ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/sess-linux-amd64.tar.gz | tar xz
-            sudo mv sess-linux-amd64 /usr/local/bin/sess
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/install.sh | sudo bash
             ```
 
-            ### macOS (Apple Silicon)
+            By default this installs `sess` to `/usr/local/bin/sess`.
+
+            To install into `/usr/bin` instead:
+
             ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/sess-darwin-arm64.tar.gz | tar xz
-            sudo mv sess-darwin-arm64 /usr/local/bin/sess
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
             ```
 
-            ### macOS (Intel)
+            ### Manual Install
+
+            Linux/macOS archive contents extract to a binary named `sess`, not a platform-named file.
+
             ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/sess-darwin-amd64.tar.gz | tar xz
-            sudo mv sess-darwin-amd64 /usr/local/bin/sess
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/sess-linux-amd64.tar.gz | tar xz
+            sudo install -m 0755 sess /usr/local/bin/sess
             ```
 
             ### Windows (PowerShell)
             ```powershell
             Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/sess-windows-amd64.zip" -OutFile "sess.zip"
             Expand-Archive sess.zip -DestinationPath .
-            # Move sess-windows-amd64.exe to a directory in your PATH
+            # Move sess.exe to a directory in your PATH
             ```
 
             ## What's Changed

@@ -15,9 +15,9 @@ type GH struct{}
 
 // Issue represents a GitHub issue with fields returned from JSON
 type Issue struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	URL   string `json:"url"`
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
 }
 
 // NewGH creates a new GH instance
@@ -141,7 +141,7 @@ func (g *GH) ListIssues(ctx context.Context, dir string, state string) (string, 
 
 // ListIssuesJSON lists issues and returns them as structured Issue objects
 func (g *GH) ListIssuesJSON(ctx context.Context, dir string, state string) ([]Issue, error) {
-	args := []string{"issue", "list", "--json", "id,title,url"}
+	args := []string{"issue", "list", "--json", "number,title,url"}
 	if state != "" {
 		args = append(args, "--state", state)
 	}
