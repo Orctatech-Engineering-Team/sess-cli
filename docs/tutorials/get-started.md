@@ -25,6 +25,15 @@ For issue selection and PR creation, make sure `gh` is already authenticated.
 curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo bash
 ```
 
+On Windows, download and extract the archive instead:
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/sess-windows-amd64.zip" -OutFile "sess.zip"
+Expand-Archive sess.zip -DestinationPath .
+Move-Item .\sess.exe "$env:USERPROFILE\\bin\\sess.exe"
+# Add $env:USERPROFILE\bin to PATH if it is not already there
+```
+
 Check that it is available:
 
 ```bash

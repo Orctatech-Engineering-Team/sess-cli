@@ -42,6 +42,15 @@ curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/lates
 sudo install -m 0755 sess /usr/local/bin/sess
 ```
 
+Windows PowerShell install example:
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/sess-windows-amd64.zip" -OutFile "sess.zip"
+Expand-Archive sess.zip -DestinationPath .
+Move-Item .\sess.exe "$env:USERPROFILE\\bin\\sess.exe"
+# Add $env:USERPROFILE\bin to PATH if it is not already there
+```
+
 ## Prerequisites
 
 - `git`
