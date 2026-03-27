@@ -32,27 +32,28 @@ git checkout main
 git pull origin main
 ```
 
-### 2. Update Version Information
+### 2. Update Documentation if Needed
 
-Update version references in documentation:
+Update any release-facing docs that changed materially:
 
-- `README.md` - Update version number in features section
-- `MVP1-SUMMARY.md` - Update if completing a major milestone
-- Any other version references
+- `README.md`
+- `docs/README.md`
+- user-facing install or workflow docs under `docs/`
+- milestone or roadmap docs when a phase boundary changes
 
 ### 3. Create and Push a Version Tag
 
 ```bash
 # Create a tag (following semantic versioning)
-git tag -a v0.2.0 -m "Release v0.2.0 - MVP1 Complete"
+git tag -a v0.3.1 -m "Release v0.3.1"
 
 # Push the tag to GitHub
-git push origin v0.2.0
+git push origin v0.3.1
 ```
 
 **Tag Format:** `v<major>.<minor>.<patch>`
 
-- Example: `v0.2.0`, `v1.0.0`, `v1.2.3`
+- Example: `v0.3.0`, `v1.0.0`, `v1.2.3`
 
 ### 4. Monitor the Release
 
@@ -82,9 +83,9 @@ Download and test the binary for your platform:
 
 ```bash
 # Example for Linux/macOS
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v0.2.0/install.sh | sudo bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v0.3.0/install.sh | sudo bash
 sess --version
-# Should output: SESS v0.2.0
+# Should output: SESS v0.3.0
 ```
 
 ## Versioning Strategy
@@ -125,8 +126,8 @@ For testing releases before official launch:
 
 ```bash
 # Create a pre-release tag
-git tag -a v0.2.0-rc1 -m "Release candidate 1 for v0.2.0"
-git push origin v0.2.0-rc1
+git tag -a v0.3.1-rc1 -m "Release candidate 1 for v0.3.1"
+git push origin v0.3.1-rc1
 ```
 
 Pre-release tags (with `-rc`, `-beta`, `-alpha`) will trigger the same workflow.
@@ -140,7 +141,7 @@ For urgent bug fixes:
 1. Create a hotfix branch from the tag:
 
    ```bash
-   git checkout -b hotfix/v0.2.1 v0.2.0
+   git checkout -b hotfix/v0.3.1 v0.3.0
    ```
 
 2. Fix the bug and commit:
@@ -152,15 +153,15 @@ For urgent bug fixes:
 3. Create a new patch version tag:
 
    ```bash
-   git tag -a v0.2.1 -m "Hotfix: Fix pause command bug"
-   git push origin v0.2.1
+   git tag -a v0.3.1 -m "Hotfix: Fix pause command bug"
+   git push origin v0.3.1
    ```
 
 4. Merge back to main:
 
    ```bash
    git checkout main
-   git merge hotfix/v0.2.1
+   git merge hotfix/v0.3.1
    git push origin main
    ```
 
@@ -208,7 +209,7 @@ If you need to create a release manually:
 
 ```bash
 # Ensure you're on the tagged commit
-git checkout v0.2.0
+git checkout v0.3.0
 
 # Build for a specific platform
 GOOS=linux GOARCH=amd64 go build \
@@ -252,7 +253,7 @@ curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/lates
 To install a specific version:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.2.0 bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.3.0 bash
 ```
 
 ### Linux/macOS (manual archive install)
@@ -274,7 +275,7 @@ brew install sess
 ### Windows (PowerShell)
 
 ```powershell
-$version = "0.2.0"
+$version = "0.3.0"
 Invoke-WebRequest -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v$version/sess-windows-amd64.zip" -OutFile "sess.zip"
 Expand-Archive sess.zip -DestinationPath $env:USERPROFILE\bin
 # Add $env:USERPROFILE\bin to PATH
@@ -293,7 +294,7 @@ Users should verify downloads using checksums:
 
 ```bash
 # Download checksum file
-curl -L https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v0.2.0/checksums.txt -o checksums.txt
+curl -L https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v0.3.0/checksums.txt -o checksums.txt
 
 # Verify (Linux/macOS)
 sha256sum -c checksums.txt --ignore-missing
@@ -323,8 +324,8 @@ go mod verify
 
 **Check tag format:**
 
-- Must match `v*.*.*` (e.g., `v0.2.0`)
-- Not `0.2.0` or `version-0.2.0`
+- Must match `v*.*.*` (e.g., `v0.3.0`)
+- Not `0.3.0` or `version-0.3.0`
 
 **Check permissions:**
 

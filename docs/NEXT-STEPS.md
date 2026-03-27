@@ -67,7 +67,8 @@ These items from the roadmap do not yet have GitHub issues. Open issues as work 
 
 ## See Also
 
-- [README.md — Roadmap](../README.md#roadmap)
+- [README.md](../README.md)
+- [docs/README.md](README.md)
 - [docs/cli_design_guide.md](cli_design_guide.md)
 - [docs/technical-spec.md](technical-spec.md)
 - [docs/MVP1-SUMMARY.md](MVP1-SUMMARY.md)
