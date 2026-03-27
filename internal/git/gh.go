@@ -20,6 +20,14 @@ type Issue struct {
 	URL    string `json:"url"`
 }
 
+// PR represents a GitHub pull request with the fields used by SESS.
+type PR struct {
+	Number int    `json:"number"`
+	URL    string `json:"url"`
+	Title  string `json:"title"`
+	State  string `json:"state"`
+}
+
 // NewGH creates a new GH instance
 func NewGH() *GH {
 	return &GH{}
@@ -71,6 +79,24 @@ func (g *GH) CreatePR(ctx context.Context, dir, title, body, base string) (strin
 		return "", fmt.Errorf("create PR failed: %w", err)
 	}
 	return out, nil
+}
+
+// FindOpenPRByHead returns the first open PR for the given branch, if any.
+func (g *GH) FindOpenPRByHead(ctx context.Context, dir, branch string) (*PR, error) {
+	out, err := g.RunCombined(ctx, dir, "pr", "list", "--head", branch, "--state", "open", "--json", "number,url,title,state")
+	if err != nil {
+		return nil, fmt.Errorf("list PRs by head failed: %w", err)
+	}
+
+	var prs []PR
+	if err := json.Unmarshal([]byte(out), &prs); err != nil {
+		return nil, fmt.Errorf("failed to parse PR list JSON: %w", err)
+	}
+	if len(prs) == 0 {
+		return nil, nil
+	}
+
+	return &prs[0], nil
 }
 
 // ListPRs lists pull requests

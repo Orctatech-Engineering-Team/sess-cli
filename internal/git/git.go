@@ -391,6 +391,15 @@ func Commit(ctx context.Context, dir, message string) error {
 	return nil
 }
 
+// LatestCommitSubject returns the subject line for HEAD.
+func LatestCommitSubject(ctx context.Context, dir string) (string, error) {
+	out, err := RunCombined(ctx, dir, "log", "-n1", "--format=%s")
+	if err != nil {
+		return "", fmt.Errorf("git log failed: %w", err)
+	}
+	return out, nil
+}
+
 // CommitAmend runs `git commit --amend --no-edit`
 func CommitAmend(ctx context.Context, dir string) error {
 	_, err := RunCombined(ctx, dir, "commit", "--amend", "--no-edit")
@@ -408,6 +417,17 @@ func IsDirty(ctx context.Context, dir string) (bool, error) {
 		return false, err
 	}
 	return strings.TrimSpace(out) != "", nil
+}
+
+// HasCommitsAheadOf reports whether HEAD is ahead of the supplied upstream.
+func HasCommitsAheadOf(ctx context.Context, dir, upstream string) (bool, error) {
+	out, err := RunCombined(ctx, dir, "rev-list", "--count", upstream+"..HEAD")
+	if err != nil {
+		return false, fmt.Errorf("git rev-list failed: %w", err)
+	}
+
+	count := strings.TrimSpace(out)
+	return count != "" && count != "0", nil
 }
 
 // IsRepo checks if the directory is a git repository
@@ -442,6 +462,15 @@ func Clone(ctx context.Context, url, targetDir string) error {
 	_, err := RunCombined(ctx, "", "clone", url, targetDir)
 	if err != nil {
 		return fmt.Errorf("git clone failed: %w", err)
+	}
+	return nil
+}
+
+// DeleteBranch deletes a local branch after it has been merged.
+func DeleteBranch(ctx context.Context, dir, branch string) error {
+	_, err := RunCombined(ctx, dir, "branch", "-d", branch)
+	if err != nil {
+		return fmt.Errorf("git branch -d failed: %w", err)
 	}
 	return nil
 }

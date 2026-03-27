@@ -65,7 +65,7 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "enter":
+		case "enter", "ctrl+j":
 			i, ok := m.list.SelectedItem().(listItem)
 			if ok {
 				m.choice = i
@@ -129,7 +129,7 @@ func (m branchInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "enter":
+		case "enter", "ctrl+j":
 			m.branch = m.textInput.Value()
 			m.done = true
 			return m, tea.Quit
@@ -194,7 +194,7 @@ func (m branchTypeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "enter":
+		case "enter", "ctrl+j":
 			i, ok := m.list.SelectedItem().(listItem)
 			if ok {
 				m.choice = i

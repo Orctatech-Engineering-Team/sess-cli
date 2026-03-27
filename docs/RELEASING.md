@@ -116,7 +116,7 @@ We follow [Semantic Versioning](https://semver.org/):
 
 - **v0.1.0** - Initial release with basic session start
 - **v0.2.0** - MVP1 - Database persistence, pause/resume, projects listing
-- **v0.3.0** - (Planned) Phase 3 - `sess end` command, PR creation
+- **v0.3.0** - Phase 3 - `sess end` command, PR creation
 - **v1.0.0** - (Future) Production-ready, stable API
 
 ## Pre-release Versions
@@ -396,8 +396,8 @@ If you encounter issues with the release process:
 
 ---
 
-**Next Release:** v0.3.0 (Phase 3 - `sess end` command)
+**Next Release:** TBD
 
 **Target Date:** TBD
 
-**Features:** PR creation, rebase automation, session completion
+**Features:** conflict recovery, auth/config work, or other post-v0.3.0 priorities

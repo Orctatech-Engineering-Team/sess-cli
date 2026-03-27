@@ -110,6 +110,43 @@ func TestManagerSessionLifecycle(t *testing.T) {
 	}
 }
 
+func TestManagerCompleteSessionStoresPRMetadata(t *testing.T) {
+	mgr, database := newTestManager(t)
+	project := newTestProject(t, mgr)
+
+	if _, err := mgr.StartSession(project.ID, "feature/test", "123", "Test issue", "feature"); err != nil {
+		t.Fatalf("start session: %v", err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	prNumber := int64(77)
+	ended, err := mgr.CompleteSession(project.ID, &prNumber, "https://github.com/example/repo/pull/77")
+	if err != nil {
+		t.Fatalf("complete session: %v", err)
+	}
+	if ended.State != db.StateEnded {
+		t.Fatalf("ended state = %q, want %q", ended.State, db.StateEnded)
+	}
+	if ended.PRNumber == nil || *ended.PRNumber != prNumber {
+		t.Fatalf("ended PR number = %v, want %d", ended.PRNumber, prNumber)
+	}
+	if ended.PRURL != "https://github.com/example/repo/pull/77" {
+		t.Fatalf("ended PR URL = %q, want PR URL", ended.PRURL)
+	}
+
+	history, err := database.GetSessionHistory(project.ID, 10)
+	if err != nil {
+		t.Fatalf("get session history: %v", err)
+	}
+	if len(history) != 1 {
+		t.Fatalf("history length = %d, want 1", len(history))
+	}
+	if history[0].PRNumber == nil || *history[0].PRNumber != prNumber {
+		t.Fatalf("history PR number = %v, want %d", history[0].PRNumber, prNumber)
+	}
+}
+
 func TestManagerStartSessionRejectsExistingActiveSession(t *testing.T) {
 	mgr, _ := newTestManager(t)
 	project := newTestProject(t, mgr)

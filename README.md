@@ -239,15 +239,15 @@ sess projects
 #    Last used: 2 hours ago
 ```
 
-### 8. End Session and Create PR (Coming in Phase 3)
+### 8. End Session and Create PR
 
 ```bash
 sess end
-# Prompts for PR description
-# Rebases onto dev
+# Prompts for commit/PR details when needed
+# Rebases onto the tracked base branch
 # Pushes branch
-# Opens PR linked to issue
-# Switches back to dev
+# Reuses or creates a PR
+# Switches back to the base branch
 ```
 
 ---
@@ -261,7 +261,7 @@ sess end
 | `sess pause` | ✅ **MVP1** | Pause current session and stop time tracking |
 | `sess resume` | ✅ **MVP1** | Resume paused session and continue time tracking |
 | `sess projects` | ✅ **MVP1** | List all tracked projects across the system |
-| `sess end` | 🚧 [Phase 3 — #3](../../issues/3) | End session, commit, push, open PR |
+| `sess end` | ✅ **v0.3.0** | End session, commit, push, create or reuse PR |
 | `sess auth` | 🚧 [Phase 4 — #6](../../issues/6) | Authenticate with GitHub (currently uses `gh` auth) |
 | `sess config` | 🚧 [Phase 4 — #7](../../issues/7) | Initialize CLI in repo with custom settings |
 
@@ -314,21 +314,20 @@ sess end
   - [x] Show session status for each project
   - [x] Display last used timestamps
 
-### Phase 3: End-to-End Workflow 🚧 **NEXT**
+### Phase 3: End-to-End Workflow ✅ **DELIVERED IN v0.3.0**
 
 **Goal:** Complete the session lifecycle from start to PR
 
-- [ ] **`sess end` Command** — [Issue #3](../../issues/3)
-  - [ ] Interactive PR description input (use PR template if exists)
-  - [ ] Commit all changes with user message
-  - [ ] Rebase onto base branch (`dev`)
-  - [ ] Conflict detection and resolution guidance
-  - [ ] Push branch to remote
-  - [ ] Create GitHub PR via `gh` CLI
-  - [ ] Link PR to issue automatically
-  - [ ] Switch back to base branch
-  - [ ] Mark session as ended
-  - [ ] Show session summary (duration, commits, PR link)
+- [x] **`sess end` Command** — [Issue #3](../../issues/3)
+  - [x] Interactive commit and PR description input
+  - [x] Commit dirty work with a user-provided message
+  - [x] Rebase onto the tracked base branch
+  - [x] Push branch to remote
+  - [x] Create or reuse a GitHub PR via `gh` CLI
+  - [x] Link PR metadata to the ended session
+  - [x] Switch back to the base branch
+  - [x] Mark session as ended
+  - [x] Show session summary (duration, PR link)
 
 - [ ] **Conflict Handling** — [Issue #4](../../issues/4)
   - [ ] Detect rebase conflicts
@@ -362,7 +361,8 @@ sess end
 - [x] **Session History** ✅ (MVP1)
   - [x] Store completed sessions in SQLite database
   - [x] Track: duration, issue, branch, state
-  - [ ] Track: commits, PR link (Phase 3)
+  - [x] Track: PR link (Phase 3)
+  - [ ] Track: commits
 
 - [ ] **Analytics Commands** — [Issue #8](../../issues/8)
   - [ ] `sess history` - Show recent sessions

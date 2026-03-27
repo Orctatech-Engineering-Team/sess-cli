@@ -209,6 +209,10 @@ The session manager supports ending a session, but the CLI does not complete the
 - The resulting PR targets the configured base branch.
 - Session state is correct even if a later step fails.
 
+**Follow-up**
+
+- Investigate PTY-specific text-input truncation seen during automated `sess end` validation. The current command flow and prompt submission behavior are working, but a harness-driven repro still dropped the literal substring `end` inside one PR summary input chunk. Treat this as a lower-priority TUI/input-path bug and verify it against real terminal usage before changing prompt behavior further.
+
 ### 9. Add conflict and interrupted-workflow recovery
 
 **Problem**

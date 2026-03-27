@@ -97,7 +97,7 @@ func (m issueSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "enter":
+		case "enter", "ctrl+j":
 			if item, ok := m.list.SelectedItem().(issueItem); ok {
 				m.selected = &item.issue
 				m.done = true

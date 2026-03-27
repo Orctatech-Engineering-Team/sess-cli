@@ -73,15 +73,8 @@ func (m *Manager) StartSession(projectID int64, branch, issueID, issueTitle, bra
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
-	// Update project's last_used_at
-	project, err := m.db.GetProjectByID(projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get project: %w", err)
-	}
-
-	project.LastUsedAt = time.Now()
-	if err := m.db.UpdateProject(project); err != nil {
-		return nil, fmt.Errorf("failed to update project: %w", err)
+	if err := m.touchProject(projectID); err != nil {
+		return nil, err
 	}
 
 	return created, nil
@@ -123,6 +116,9 @@ func (m *Manager) PauseSession(projectID int64) (*db.Session, error) {
 	if err := m.db.UpdateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to pause session: %w", err)
 	}
+	if err := m.touchProject(projectID); err != nil {
+		return nil, err
+	}
 
 	return session, nil
 }
@@ -146,12 +142,20 @@ func (m *Manager) ResumeSession(projectID int64) (*db.Session, error) {
 	if err := m.db.UpdateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to resume session: %w", err)
 	}
+	if err := m.touchProject(projectID); err != nil {
+		return nil, err
+	}
 
 	return session, nil
 }
 
 // EndSession ends an active or paused session
 func (m *Manager) EndSession(projectID int64) (*db.Session, error) {
+	return m.CompleteSession(projectID, nil, "")
+}
+
+// CompleteSession ends an active or paused session and attaches PR metadata.
+func (m *Manager) CompleteSession(projectID int64, prNumber *int64, prURL string) (*db.Session, error) {
 	session, err := m.db.GetActiveSession(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active session: %w", err)
@@ -172,9 +176,14 @@ func (m *Manager) EndSession(projectID int64) (*db.Session, error) {
 	session.State = db.StateEnded
 	session.EndTime = &now
 	session.CurrentSliceStart = nil
+	session.PRNumber = prNumber
+	session.PRURL = prURL
 
 	if err := m.db.UpdateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to end session: %w", err)
+	}
+	if err := m.touchProject(projectID); err != nil {
+		return nil, err
 	}
 
 	return session, nil
@@ -240,4 +249,21 @@ func (m *Manager) SyncActiveSession(projectID int64) (*db.Session, error) {
 	}
 
 	return session, nil
+}
+
+func (m *Manager) touchProject(projectID int64) error {
+	project, err := m.db.GetProjectByID(projectID)
+	if err != nil {
+		return fmt.Errorf("failed to get project: %w", err)
+	}
+	if project == nil {
+		return fmt.Errorf("project %d not found", projectID)
+	}
+
+	project.LastUsedAt = time.Now()
+	if err := m.db.UpdateProject(project); err != nil {
+		return fmt.Errorf("failed to update project: %w", err)
+	}
+
+	return nil
 }

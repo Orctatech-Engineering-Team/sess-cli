@@ -87,15 +87,60 @@ func TestOpenMigratesCurrentSliceStartColumn(t *testing.T) {
 		}
 	}()
 
+	assertSessionsColumnCount(t, database, "current_slice_start", 1)
+	assertSessionsColumnCount(t, database, "pr_number", 1)
+	assertSessionsColumnCount(t, database, "pr_url", 1)
+}
+
+func TestSessionHistoryRoundTripsPRMetadata(t *testing.T) {
+	database := newTestDB(t)
+	project := newTestProject(t, database)
+
+	prNumber := int64(45)
+	endTime := time.Now()
+
+	if _, err := database.CreateSession(&Session{
+		ProjectID:         project.ID,
+		Branch:            "feature/with-pr",
+		State:             StateEnded,
+		StartTime:         time.Now().Add(-time.Hour),
+		EndTime:           &endTime,
+		CurrentSliceStart: nil,
+		TotalElapsed:      int64(30 * time.Minute),
+		BranchType:        "feature",
+		PRNumber:          &prNumber,
+		PRURL:             "https://github.com/example/repo/pull/45",
+	}); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	history, err := database.GetSessionHistory(project.ID, 10)
+	if err != nil {
+		t.Fatalf("get session history: %v", err)
+	}
+	if len(history) != 1 {
+		t.Fatalf("history length = %d, want 1", len(history))
+	}
+	if history[0].PRNumber == nil || *history[0].PRNumber != prNumber {
+		t.Fatalf("history PR number = %v, want %d", history[0].PRNumber, prNumber)
+	}
+	if history[0].PRURL != "https://github.com/example/repo/pull/45" {
+		t.Fatalf("history PR URL = %q, want PR URL", history[0].PRURL)
+	}
+}
+
+func assertSessionsColumnCount(t *testing.T, database *DB, column string, want int) {
+	t.Helper()
+
 	var count int
 	if err := database.conn.QueryRow(`
 		SELECT COUNT(*) FROM pragma_table_info('sessions')
-		WHERE name = 'current_slice_start'
-	`).Scan(&count); err != nil {
-		t.Fatalf("query current_slice_start column: %v", err)
+		WHERE name = ?
+	`, column).Scan(&count); err != nil {
+		t.Fatalf("query %s column: %v", column, err)
 	}
-	if count != 1 {
-		t.Fatalf("current_slice_start column count = %d, want 1", count)
+	if count != want {
+		t.Fatalf("%s column count = %d, want %d", column, count, want)
 	}
 }
 

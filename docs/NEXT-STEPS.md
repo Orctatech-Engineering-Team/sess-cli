@@ -8,7 +8,6 @@ This document consolidates the open GitHub issues and remaining roadmap phases s
 
 | # | Title | Phase | Priority |
 |---|-------|-------|----------|
-| [#3](../../issues/3) | Implement `sess end` workflow | Phase 3 | 🔴 High |
 | [#4](../../issues/4) | Surface and recover from rebase or push conflicts | Phase 3 | 🔴 High |
 | [#5](../../issues/5) | Align CLI output with design guide | Cross-cutting | 🟡 Medium |
 | [#6](../../issues/6) | Add GitHub auth command | Phase 4 | 🟡 Medium |
@@ -19,12 +18,11 @@ This document consolidates the open GitHub issues and remaining roadmap phases s
 
 ## Recommended Work Order
 
-### 1. Phase 3 — Complete the Session Lifecycle (Issues #3, #4)
+### 1. Phase 3 — Finish Conflict Recovery (Issue #4)
 
-This is the most impactful next milestone. `sess end` closes the loop from session start to a merged PR, making SESS a complete tool rather than a partial one.
+`sess end` is now implemented. The remaining Phase 3 gap is robust recovery from rebase, push, or PR-creation interruptions.
 
 **Start here:**
-- [#3 — Implement `sess end` workflow](../../issues/3): prompt for PR description, commit, rebase, push, open PR via `gh`, switch back to base branch, mark session ended.
 - [#4 — Conflict handling](../../issues/4): detect rebase conflicts, pause workflow gracefully, allow the user to resolve and resume.
 
 ### 2. Cross-Cutting — Output Quality (Issue #5)
@@ -73,3 +71,4 @@ These items from the roadmap do not yet have GitHub issues. Open issues as work 
 - [docs/cli_design_guide.md](cli_design_guide.md)
 - [docs/technical-spec.md](technical-spec.md)
 - [docs/MVP1-SUMMARY.md](MVP1-SUMMARY.md)
+- [docs/IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)
