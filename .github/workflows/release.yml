@@ -82,6 +82,20 @@ jobs:
         run: |
           cp scripts/install.sh dist/install.sh
 
+      - name: Validate installer against release artifacts
+        run: |
+          bash -n dist/install.sh
+
+          INSTALL_DIR="$RUNNER_TEMP/sess-install/bin"
+          mkdir -p "$INSTALL_DIR"
+
+          SESS_BASE_URL="file://$PWD/dist" \
+          SESS_INSTALL_DIR="$INSTALL_DIR" \
+          bash dist/install.sh
+
+          test -x "$INSTALL_DIR/sess"
+          "$INSTALL_DIR/sess" --version
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
