@@ -161,4 +161,5 @@ sudo install -m 0755 sess /usr/local/bin/sess
 ## Releases
 
 - [Latest release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest)
+- [v0.4.0 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.4.0)
 - [v0.3.1 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.3.1)
