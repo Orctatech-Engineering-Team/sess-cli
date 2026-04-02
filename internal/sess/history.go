@@ -11,19 +11,15 @@ import (
 )
 
 var historyLimit int
+var historyAll bool
 
 var historyCmd = &cobra.Command{
 	Use:   "history",
 	Short: "Show recent session history",
-	Long:  "Display recent sessions for the tracked project in the current directory.",
+	Long:  "Display recent sessions for the tracked project in the current directory or across all tracked projects.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if historyLimit < 1 {
 			return fmt.Errorf("history limit must be at least 1")
-		}
-
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get current directory: %w", err)
 		}
 
 		dbPath, err := db.GetDefaultDBPath()
@@ -38,6 +34,33 @@ var historyCmd = &cobra.Command{
 		defer database.Close()
 
 		mgr := session.NewManager(database)
+
+		if historyAll {
+			entries, err := mgr.GetGlobalSessionHistory(historyLimit)
+			if err != nil {
+				return fmt.Errorf("failed to get global session history: %w", err)
+			}
+			if len(entries) == 0 {
+				fmt.Println("No session history")
+				fmt.Println()
+				fmt.Println("Run 'sess start' to begin tracking.")
+				return nil
+			}
+
+			fmt.Printf("Session history (%d)\n\n", len(entries))
+			for i, entry := range entries {
+				printHistoryEntry(mgr, entry.Project.Name, entry.Session)
+				if i < len(entries)-1 {
+					fmt.Println()
+				}
+			}
+			return nil
+		}
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
 
 		project, err := mgr.GetProject(cwd)
 		if err != nil {
@@ -62,7 +85,7 @@ var historyCmd = &cobra.Command{
 		fmt.Printf("Session history (%d)\n\n", len(sessions))
 
 		for i, sess := range sessions {
-			printHistoryEntry(mgr, sess)
+			printHistoryEntry(mgr, "", sess)
 			if i < len(sessions)-1 {
 				fmt.Println()
 			}
@@ -72,8 +95,12 @@ var historyCmd = &cobra.Command{
 	},
 }
 
-func printHistoryEntry(mgr *session.Manager, sess *db.Session) {
-	fmt.Println(formatBranchDisplay(sess))
+func printHistoryEntry(mgr *session.Manager, projectName string, sess *db.Session) {
+	if projectName != "" {
+		fmt.Printf("%s · %s\n", projectName, formatBranchDisplay(sess))
+	} else {
+		fmt.Println(formatBranchDisplay(sess))
+	}
 
 	elapsed := time.Duration(sess.TotalElapsed)
 	if sess.State == db.StateActive {
@@ -118,6 +145,7 @@ func formatBranchDisplay(sess *db.Session) string {
 }
 
 func init() {
+	historyCmd.Flags().BoolVar(&historyAll, "all", false, "Show recent sessions across all tracked projects")
 	historyCmd.Flags().IntVarP(&historyLimit, "limit", "n", 10, "Number of sessions to show")
 	rootCmd.AddCommand(historyCmd)
 }

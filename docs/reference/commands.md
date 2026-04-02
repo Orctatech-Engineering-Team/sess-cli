@@ -138,11 +138,13 @@ Shows recent session history for the tracked project in the current directory.
 ```bash
 sess history
 sess history --limit 20
+sess history --all
 ```
 
 ### Behavior
 
 - fails if the current directory is not a tracked project
+- `--all` shows recent sessions across all tracked projects instead of the current directory
 - shows the newest sessions first
 - includes active, paused, and ended sessions
 - shows elapsed time, issue metadata, and PR metadata when available
@@ -156,16 +158,38 @@ Shows aggregate session statistics for the tracked project in the current direct
 
 ```bash
 sess stats
+sess stats --all
 ```
 
 ### Behavior
 
 - fails if the current directory is not a tracked project
+- `--all` aggregates across all tracked projects instead of the current directory
 - summarizes total sessions and accumulated elapsed time
 - includes average session duration and longest recorded session
 - counts active, paused, and ended sessions
 - counts sessions with linked PR metadata
 - reports the first and most recent recorded session start times
+
+## `sess report`
+
+Shows a compact session report with summary metrics and recent sessions.
+
+### Usage
+
+```bash
+sess report
+sess report --limit 8
+sess report --all
+```
+
+### Behavior
+
+- fails if the current directory is not a tracked project
+- `--all` reports across all tracked projects instead of the current directory
+- combines aggregate stats with a recent-session summary
+- includes longest-session metadata and recent issue or PR context when available
+- limits the embedded recent-session list, defaulting to 5
 
 ## Root Command
 
