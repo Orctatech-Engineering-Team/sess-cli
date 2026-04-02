@@ -42,7 +42,7 @@ Reduce setup friction and allow per-repo customization.
 
 Surface the session data already persisted in SQLite.
 
-- [#8 — Session analytics commands](../../issues/8): `sess history`, `sess stats`, `sess report`.
+- [#8 — Session analytics commands](../../issues/8): extend the new `sess history` and `sess stats` foundation, then add `sess report`.
 
 ---
 

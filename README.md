@@ -94,6 +94,8 @@ Typical workflow:
 | `sess resume` | Resume a paused session |
 | `sess end` | End a session and hand off work through a PR |
 | `sess projects` | List tracked projects |
+| `sess history` | Show recent session history for the current project |
+| `sess stats` | Show aggregate session statistics for the current project |
 
 ## Documentation
 
@@ -126,12 +128,14 @@ Implemented:
 - `sess resume`
 - `sess end`
 - `sess projects`
+- `sess history`
+- `sess stats`
 
 Not implemented yet:
 
 - resumable conflict recovery for interrupted `sess end` flows
 - first-class auth/config commands
-- analytics commands
+- richer analytics reporting
 
 ## Data Storage
 

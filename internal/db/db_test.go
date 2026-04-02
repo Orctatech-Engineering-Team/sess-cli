@@ -240,3 +240,46 @@ func TestGetSessionHistoryOrdersNewestFirstAndAppliesLimit(t *testing.T) {
 		t.Fatalf("history[1].Branch = %q, want %q", history[1].Branch, "feature/two")
 	}
 }
+
+func TestListSessionsReturnsAllSessionsNewestFirst(t *testing.T) {
+	database := newTestDB(t)
+	project := newTestProject(t, database)
+
+	startTimes := []time.Time{
+		time.Now().Add(-3 * time.Hour),
+		time.Now().Add(-2 * time.Hour),
+		time.Now().Add(-1 * time.Hour),
+	}
+	branches := []string{"feature/one", "feature/two", "feature/three"}
+
+	for i := range startTimes {
+		if _, err := database.CreateSession(&Session{
+			ProjectID:         project.ID,
+			Branch:            branches[i],
+			State:             StateEnded,
+			StartTime:         startTimes[i],
+			CurrentSliceStart: nil,
+			TotalElapsed:      int64(time.Minute),
+			BranchType:        "feature",
+		}); err != nil {
+			t.Fatalf("create session %d: %v", i, err)
+		}
+	}
+
+	sessions, err := database.ListSessions(project.ID)
+	if err != nil {
+		t.Fatalf("list sessions: %v", err)
+	}
+	if len(sessions) != 3 {
+		t.Fatalf("sessions length = %d, want 3", len(sessions))
+	}
+	if sessions[0].Branch != "feature/three" {
+		t.Fatalf("sessions[0].Branch = %q, want %q", sessions[0].Branch, "feature/three")
+	}
+	if sessions[1].Branch != "feature/two" {
+		t.Fatalf("sessions[1].Branch = %q, want %q", sessions[1].Branch, "feature/two")
+	}
+	if sessions[2].Branch != "feature/one" {
+		t.Fatalf("sessions[2].Branch = %q, want %q", sessions[2].Branch, "feature/one")
+	}
+}

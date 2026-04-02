@@ -129,6 +129,44 @@ sess projects
 - includes branch, elapsed time, and issue number for active or paused sessions
 - marks the current working directory with `*`
 
+## `sess history`
+
+Shows recent session history for the tracked project in the current directory.
+
+### Usage
+
+```bash
+sess history
+sess history --limit 20
+```
+
+### Behavior
+
+- fails if the current directory is not a tracked project
+- shows the newest sessions first
+- includes active, paused, and ended sessions
+- shows elapsed time, issue metadata, and PR metadata when available
+- limits output to the most recent sessions, defaulting to 10
+
+## `sess stats`
+
+Shows aggregate session statistics for the tracked project in the current directory.
+
+### Usage
+
+```bash
+sess stats
+```
+
+### Behavior
+
+- fails if the current directory is not a tracked project
+- summarizes total sessions and accumulated elapsed time
+- includes average session duration and longest recorded session
+- counts active, paused, and ended sessions
+- counts sessions with linked PR metadata
+- reports the first and most recent recorded session start times
+
 ## Root Command
 
 Run:

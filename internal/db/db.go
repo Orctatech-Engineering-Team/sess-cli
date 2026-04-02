@@ -386,6 +386,30 @@ func (db *DB) UpdateSession(s *Session) error {
 	return nil
 }
 
+// ListSessions retrieves all sessions for a project, newest first.
+func (db *DB) ListSessions(projectID int64) ([]*Session, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, project_id, branch, COALESCE(issue_id, ''), COALESCE(issue_title, ''),
+		        state, start_time, pause_time, end_time, current_slice_start, total_elapsed, COALESCE(branch_type, ''),
+		        pr_number, COALESCE(pr_url, '')
+		 FROM sessions
+		 WHERE project_id = ?
+		 ORDER BY start_time DESC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sessions: %w", err)
+	}
+	defer rows.Close()
+
+	sessions, err := scanSessions(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sessions: %w", err)
+	}
+
+	return sessions, nil
+}
+
 // GetSessionHistory retrieves session history for a project
 func (db *DB) GetSessionHistory(projectID int64, limit int) ([]*Session, error) {
 	rows, err := db.conn.Query(
@@ -402,6 +426,15 @@ func (db *DB) GetSessionHistory(projectID int64, limit int) ([]*Session, error) 
 	}
 	defer rows.Close()
 
+	sessions, err := scanSessions(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session history: %w", err)
+	}
+
+	return sessions, nil
+}
+
+func scanSessions(rows *sql.Rows) ([]*Session, error) {
 	var sessions []*Session
 	for rows.Next() {
 		var s Session
@@ -431,6 +464,10 @@ func (db *DB) GetSessionHistory(projectID int64, limit int) ([]*Session, error) 
 		}
 
 		sessions = append(sessions, &s)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate sessions: %w", err)
 	}
 
 	return sessions, nil
