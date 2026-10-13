@@ -1,6 +1,7 @@
 # Architecture
 
-This document describes the current SESS architecture at `v0.3.1`.
+This document describes the current SESS architecture, including guarded
+end-workflow recovery.
 
 SESS is a Go CLI that manages developer work as explicit sessions tied to repositories, branches, optional GitHub issues, and pull requests.
 
@@ -146,10 +147,16 @@ Only one active or paused session may exist per project at a time.
 5. If the stored base branch is invalid, the TUI repairs it before continuing.
 6. TUI collects issue, branch name, branch type, and dirty-worktree choices.
 7. Git wrappers:
-   - check out the tracked base branch
-   - pull `origin/<baseBranch>`
+   - check out the tracked base branch without overwriting ignored files
+   - fetch `origin/<baseBranch>` and fast-forward without overwriting ignored files
    - create the new session branch
-8. Session manager persists the new active session.
+8. Verify the current branch and head, then atomically persist the active session,
+   start event, and project activity before reporting success.
+
+An existing exact local branch may be adopted with explicit interactive consent
+or `sess start --adopt <branch>`. Adoption skips base updates and branch creation.
+Persistence failure leaves Git state intact for retry; no pending-start checkpoint
+is stored. Quitting the running workflow cancels it and waits before returning.
 
 ### `sess resume`
 
@@ -161,9 +168,10 @@ Only one active or paused session may exist per project at a time.
 ### `sess end`
 
 1. Command loads the tracked project and active or paused session.
-2. TUI aligns the shell to the saved session branch if necessary.
+2. TUI rejects an unfinished rebase before aligning to the saved session branch.
 3. TUI checks whether there is shippable work.
-4. If dirty, SESS prompts for a commit message and commits the work.
+4. If dirty, SESS prompts for a commit message. PR details are prompted only when
+   no open PR exists for the session branch.
 5. SESS fetches, rebases, and pushes the branch.
 6. SESS reuses an existing PR or creates a new one through `gh`.
 7. SESS checks out the project base branch.
@@ -172,6 +180,13 @@ Only one active or paused session may exist per project at a time.
 Failure rule:
 
 - if an end-workflow step fails before session completion, the session remains open
+- an unfinished rebase is resolved with Git before retrying `sess end`
+- exiting the end workflow UI cancels subprocess work and waits for it to stop
+
+The end executor checks rebase state again before committing, and commits dirty
+work before fetching. PR lookup is repeated after push, so a retry can discover
+a PR created by an earlier attempt. End progress and prompt inputs are saved
+before continuing to later side effects.
 
 ## Persistence
 
@@ -185,13 +200,17 @@ Main persisted data:
 
 - tracked projects and base branches
 - session state and elapsed time
+- successful lifecycle transitions
 - linked issue metadata
 - PR number and PR URL for ended sessions
+- interrupted end-workflow progress and saved prompt inputs
 
-The current schema is centered on two tables:
+The current schema includes:
 
 - `projects`
 - `sessions`
+- `session_events`
+- `end_workflows`
 
 `sessions.total_elapsed` and `sessions.current_slice_start` are used together so pause and resume can accumulate time accurately across multiple active slices.
 
@@ -231,9 +250,30 @@ Why:
 - lifecycle rules still live below the TUI in `internal/session`
 - git and GitHub side effects stay concentrated in one orchestration layer
 
-## Current Gaps
+## Lifecycle History
 
-The main architectural follow-up after `v0.3.1` is conflict and interrupted-workflow recovery for `sess end`.
+`sessions` remains the current-state and elapsed-total authority. An append-only
+`session_events` journal records successful starts, pauses, resumes, and ends.
+Lifecycle writes commit the session, event, and project activity together;
+completion also removes its end checkpoint. Guarded timer syncs emit no event.
+
+`internal/session` derives a detail timeline from a consistent snapshot of the
+session and ID-ordered events. Only observed start/resume events anchor active
+intervals. Old sessions are not backfilled, and incomplete history is explicit.
+This is a lifecycle journal, not event sourcing or focus telemetry.
+
+## End Recovery Limits
+
+End recovery uses an `end_workflows` SQLite checkpoint keyed by session ID.
+It records immutable prompt inputs and repository identity, completed phases,
+the expected branch head, rebase intent, and discovered PR identity.
+The TUI reconciles Git and GitHub state before continuing side effects.
+Session completion, project activity, and checkpoint deletion share a transaction.
+
+Recovery supports matching open and merged PRs, but stops for closed-unmerged
+PRs or uncertain identity. Conflicts remain manually resolved. Fork-based PRs,
+different origin fetch/push destinations, and automatic checkpoint reset are
+not supported.
 
 See:
 

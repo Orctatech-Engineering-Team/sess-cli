@@ -115,6 +115,9 @@ type endWorkflowConfig struct {
 	endWithoutPR  bool
 	prTitle       string
 	prBody        string
+	pr            *git.PR
+	repository    string
+	remoteID      string
 }
 
 type endWorkflowResult struct {
@@ -220,111 +223,36 @@ func RunEndTUI(cwd string, database *db.DB) error {
 		return fmt.Errorf("no active or paused session found")
 	}
 
-	currentBranch, err := git.CurrentBranch(ctx, cwd)
+	if err := checkEndRebase(ctx, cwd); err != nil {
+		return err
+	}
+
+	cfg, cancelled, err := prepareEndConfig(ctx, database, endWorkflowConfig{
+		cwd: cwd, project: project, session: activeSession,
+	})
 	if err != nil {
-		return fmt.Errorf("determine current branch before ending session: %w", err)
+		return err
 	}
-	if currentBranch != activeSession.Branch {
-		fmt.Printf("Switching to branch %s...", activeSession.Branch)
-		if err := git.Checkout(ctx, cwd, activeSession.Branch); err != nil {
-			fmt.Println(" failed")
-			return fmt.Errorf("switch to session branch %s before ending: %w", activeSession.Branch, err)
-		}
-		fmt.Println(" done")
+	if cancelled {
+		return nil
 	}
 
-	dirty, err := git.IsDirty(ctx, cwd)
-	if err != nil {
-		return fmt.Errorf("check worktree state: %w", err)
-	}
-
-	baseBranch := project.BaseBranch
-	if baseBranch == "" {
-		baseBranch = "dev"
-	}
-	project.BaseBranch = baseBranch
-	ahead, err := git.HasCommitsAheadOf(ctx, cwd, "origin/"+baseBranch)
-	if err != nil {
-		return fmt.Errorf("check commits ahead of origin/%s: %w", baseBranch, err)
-	}
-
-	shipWork := hasShippableWork(dirty, ahead)
-	endWithoutPR := false
-	commitMessage := ""
-	if !shipWork {
-		choice, err := runListPrompt("No uncommitted changes or commits ahead of the base branch. What would you like to do?", []list.Item{
-			choiceEndAnyway,
-			choiceCancelEnd,
-		})
-		if err != nil {
-			return err
-		}
-		switch choice {
-		case choiceCancelEnd:
-			return nil
-		case choiceEndAnyway:
-			endWithoutPR = true
-		default:
-			return nil
-		}
-	}
-
-	if dirty {
-		var cancelled bool
-		commitMessage, cancelled, err = runTextPrompt("Enter a commit message for the changes you want to ship", "Update session work", true)
-		if err != nil {
-			return err
-		}
-		if cancelled {
-			return nil
-		}
-	}
-
-	cfg := endWorkflowConfig{
-		cwd:           cwd,
-		project:       project,
-		session:       activeSession,
-		commitMessage: commitMessage,
-		endWithoutPR:  endWithoutPR,
-	}
-
-	if !endWithoutPR {
-		cfg.prTitle, err = buildPRTitle(ctx, cwd, activeSession)
-		if err != nil {
-			return err
-		}
-
-		summary, cancelled, err := runTextPrompt("PR summary", "Describe what changed", true)
-		if err != nil {
-			return err
-		}
-		if cancelled {
-			return nil
-		}
-		testing, cancelled, err := runTextPrompt("PR testing", "How did you verify it?", false)
-		if err != nil {
-			return err
-		}
-		if cancelled {
-			return nil
-		}
-		notes, cancelled, err := runTextPrompt("PR notes", "Anything reviewers should know?", false)
-		if err != nil {
-			return err
-		}
-		if cancelled {
-			return nil
-		}
-		cfg.prBody = renderPRBody(activeSession, prPromptValues{
-			Summary: summary,
-			Testing: testing,
-			Notes:   notes,
-		})
-	}
-
+	workflowCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	program := tea.NewProgram(newEndWorkflowModel(activeSession.Branch))
-	go runEndWorkflow(program, database, cfg)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		result, err := executeEndWorkflow(workflowCtx, database, cfg, program.Send)
+		if err != nil {
+			program.Send(gitErrMsg{err})
+			return
+		}
+		program.Send(endSuccessMsg{result: result})
+	}()
 	finalModel, err := program.Run()
+	cancel()
+	<-finished
 	if err != nil {
 		return err
 	}
@@ -335,6 +263,9 @@ func RunEndTUI(cwd string, database *db.DB) error {
 	}
 	if workflow.err != nil {
 		return workflow.err
+	}
+	if !workflow.done {
+		return fmt.Errorf("end workflow interrupted. Check 'sess status' and 'git status' before retrying 'sess end'")
 	}
 
 	cleanupChoice, err := runListPrompt("What would you like to do with the local session branch?", []list.Item{
@@ -389,133 +320,28 @@ func runTextPrompt(title, placeholder string, required bool) (string, bool, erro
 	return result.value, false, nil
 }
 
-func runEndWorkflow(p *tea.Program, database *db.DB, cfg endWorkflowConfig) {
-	ctx := context.Background()
-	mgr := session.NewManager(database)
-	gh := git.NewGH()
+const endRebaseRecovery = "Session remains open. Resolve conflicts, stage resolved files with 'git add <files>', " +
+	"then run 'git rebase --continue'. Repeat until the rebase finishes, then rerun 'sess end'.\n" +
+	"To cancel the rebase instead, run 'git rebase --abort'."
 
-	fail := func(err error) {
-		p.Send(gitErrMsg{err})
-	}
-
-	sendLog := func(format string, args ...any) {
-		p.Send(gitLineMsg(fmt.Sprintf(format, args...)))
-	}
-
-	if cfg.commitMessage != "" {
-		sendLog("Adding changes")
-		if err := git.AddAll(ctx, cfg.cwd); err != nil {
-			fail(fmt.Errorf("commit staged changes failed: %w", err))
-			return
-		}
-		sendLog("Creating commit")
-		if err := git.Commit(ctx, cfg.cwd, cfg.commitMessage); err != nil {
-			fail(fmt.Errorf("commit changes failed: %w", err))
-			return
-		}
-	}
-
-	if cfg.endWithoutPR {
-		sendLog("Checking out %s", cfg.project.BaseBranch)
-		if err := runGitStep(ctx, p, cfg.cwd, "checkout", cfg.project.BaseBranch); err != nil {
-			fail(fmt.Errorf("switch back to %s failed: %w", cfg.project.BaseBranch, err))
-			return
-		}
-
-		ended, err := mgr.CompleteSession(cfg.project.ID, nil, "")
-		if err != nil {
-			fail(fmt.Errorf("mark session ended: %w", err))
-			return
-		}
-
-		p.Send(endSuccessMsg{result: endWorkflowResult{
-			session:      ended,
-			endWithoutPR: true,
-		}})
-		return
-	}
-
-	sendLog("Fetching origin/%s", cfg.project.BaseBranch)
-	if err := runGitStep(ctx, p, cfg.cwd, "fetch", "origin", cfg.project.BaseBranch); err != nil {
-		fail(fmt.Errorf("fetch origin/%s failed: %w", cfg.project.BaseBranch, err))
-		return
-	}
-
-	sendLog("Rebasing onto origin/%s", cfg.project.BaseBranch)
-	if err := runGitStep(ctx, p, cfg.cwd, "rebase", "origin/"+cfg.project.BaseBranch); err != nil {
-		fail(fmt.Errorf("rebase onto origin/%s failed: %w\n\nResolve conflicts manually or run 'git rebase --abort', then rerun 'sess end'", cfg.project.BaseBranch, err))
-		return
-	}
-
-	sendLog("Pushing %s", cfg.session.Branch)
-	if err := runGitStep(ctx, p, cfg.cwd, "push", "-u", "origin", cfg.session.Branch); err != nil {
-		fail(fmt.Errorf("push branch %s failed: %w\n\nInspect your remote/auth state, then rerun 'sess end'", cfg.session.Branch, err))
-		return
-	}
-
-	sendLog("Checking for existing pull request")
-	pr, err := gh.FindOpenPRByHead(ctx, cfg.cwd, cfg.session.Branch)
+func checkEndRebase(ctx context.Context, cwd string) error {
+	inProgress, err := git.RebaseInProgress(ctx, cwd)
 	if err != nil {
-		fail(fmt.Errorf("check for existing pull request failed: %w", err))
-		return
+		return fmt.Errorf("check rebase state before ending session: %w", err)
 	}
-
-	if pr == nil {
-		sendLog("Creating pull request")
-		out, err := gh.CreatePR(ctx, cfg.cwd, cfg.prTitle, cfg.prBody, cfg.project.BaseBranch)
-		if err != nil {
-			fail(fmt.Errorf("create pull request failed: %w\n\nThe branch may already be pushed. Rerun 'sess end' after resolving the issue", err))
-			return
-		}
-		sendLog(strings.TrimSpace(out))
-
-		pr, err = gh.FindOpenPRByHead(ctx, cfg.cwd, cfg.session.Branch)
-		if err != nil {
-			fail(fmt.Errorf("look up created pull request failed: %w", err))
-			return
-		}
-		if pr == nil {
-			pr = prFromCreateOutput(strings.TrimSpace(out))
-		}
-		if pr == nil {
-			fail(fmt.Errorf("created pull request, but could not determine its metadata"))
-			return
-		}
-	} else {
-		sendLog("Using existing PR #%d", pr.Number)
+	if inProgress {
+		return fmt.Errorf("rebase in progress\n\n%s", endRebaseRecovery)
 	}
-
-	sendLog("Checking out %s", cfg.project.BaseBranch)
-	if err := runGitStep(ctx, p, cfg.cwd, "checkout", cfg.project.BaseBranch); err != nil {
-		fail(fmt.Errorf("switch back to %s failed after PR creation: %w\n\nThe pull request succeeded, but the session remains open because cleanup did not complete", cfg.project.BaseBranch, err))
-		return
-	}
-
-	var prNumber *int64
-	if pr != nil && pr.Number > 0 {
-		number := int64(pr.Number)
-		prNumber = &number
-	}
-
-	ended, err := mgr.CompleteSession(cfg.project.ID, prNumber, pr.URL)
-	if err != nil {
-		fail(fmt.Errorf("mark session ended: %w", err))
-		return
-	}
-
-	p.Send(endSuccessMsg{result: endWorkflowResult{
-		session: ended,
-		pr:      pr,
-	}})
+	return nil
 }
 
-func runGitStep(ctx context.Context, p *tea.Program, dir string, args ...string) error {
+func runGitStep(ctx context.Context, send func(tea.Msg), dir string, args ...string) error {
 	return git.RunStream(ctx, dir, args,
 		func(line string) {
-			p.Send(gitLineMsg(line))
+			send(gitLineMsg(line))
 		},
 		func(line string) {
-			p.Send(gitErrLineMsg(line))
+			send(gitErrLineMsg(line))
 		},
 	)
 }

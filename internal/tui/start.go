@@ -339,19 +339,6 @@ func (m startModel) View() string {
 	return s
 }
 
-// runStart orchestrates checkout base branch → pull → create branch with live logs
-func runStart(p *tea.Program, dir, baseBranch, branchType, branchName string) {
-	streamStep(p, dir, []string{"checkout", baseBranch}, func() {
-		streamStep(p, dir, []string{"pull", "origin", baseBranch}, func() {
-			safe := sanitizeBranchName(branchName)
-			fullBranch := branchType + "/" + safe
-			streamStep(p, dir, []string{"checkout", "-b", fullBranch}, func() {
-				p.Send(gitSuccessMsg{})
-			})
-		})
-	})
-}
-
 // ---------------- Public Entry ----------------
 
 func RunStartTUI(featureName string, cwd string, database *db.DB) error {
@@ -370,8 +357,11 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	if !isRepo {
 		return fmt.Errorf("not a git repository")
 	}
+	if err := checkStartRebase(ctx, cwd); err != nil {
+		return err
+	}
 
-	project, baseBranch, err := resolveStartProject(ctx, mgr, database, cwd)
+	project, _, err := resolveStartProject(ctx, mgr, database, cwd)
 	if err != nil {
 		return err
 	}
@@ -450,6 +440,39 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 		return fmt.Errorf("no branch type selected")
 	}
 
+	safeName := sanitizeBranchName(branchName)
+	if safeName == "" {
+		return fmt.Errorf("branch name must contain letters or digits")
+	}
+	fullBranch := branchType + "/" + safeName
+	head, err := git.LocalBranchHead(ctx, cwd, fullBranch)
+	if err != nil {
+		return fmt.Errorf("check session branch: %w", err)
+	}
+	if fullBranch == project.BaseBranch {
+		return fmt.Errorf("cannot start a session on base branch %s", fullBranch)
+	}
+	if head != "" {
+		choice, err := runListPrompt("Branch "+fullBranch+" already exists. Track it without changing its work?", []list.Item{
+			listItem{title: "Track existing branch", desc: "Keep its commits and working tree; start tracking now"},
+			listItem{title: "Cancel", desc: "Leave the branch untracked"},
+		})
+		if err != nil {
+			return err
+		}
+		if choice.title != "Track existing branch" {
+			return nil
+		}
+		cfg := startConfig(cwd, project, fullBranch, branchType, selectedIssue)
+		cfg.adopt = true
+		started, err := runStartWorkflow(database, cfg)
+		if err != nil {
+			return err
+		}
+		printStartedSession(started)
+		return nil
+	}
+
 	// 4. Check if repo is dirty
 	dirty, err := git.IsDirty(ctx, cwd)
 	if err != nil {
@@ -496,48 +519,30 @@ func RunStartTUI(featureName string, cwd string, database *db.DB) error {
 	}
 
 	// 5. Run main start model with live logs
-	fullBranch := branchType + "/" + sanitizeBranchName(branchName)
 	if selectedIssue != nil {
 		fmt.Printf("Starting session for issue #%d: %s\n", selectedIssue.Number, selectedIssue.Title)
 		fmt.Printf("Branch: %s\n\n", fullBranch)
 	}
 
-	p := tea.NewProgram(newStartModel(fullBranch))
-	go runStart(p, cwd, baseBranch, branchType, branchName) // start git orchestration in background
-	finalModel, err := p.Run()
+	started, err := runStartWorkflow(database, startConfig(cwd, project, fullBranch, branchType, selectedIssue))
 	if err != nil {
 		return err
 	}
+	printStartedSession(started)
+	return nil
+}
 
-	// Check if git operations succeeded
-	if sm, ok := finalModel.(startModel); ok {
-		if sm.err != nil {
-			return sm.err
-		}
-	}
-
-	// 6. Persist session to database
+func startConfig(cwd string, project *db.Project, branch, branchType string, issue *git.Issue) startWorkflowConfig {
 	issueID := ""
 	issueTitle := ""
-	if selectedIssue != nil {
-		issueID = strconv.Itoa(selectedIssue.Number)
-		issueTitle = selectedIssue.Title
+	if issue != nil {
+		issueID = strconv.Itoa(issue.Number)
+		issueTitle = issue.Title
 	}
-
-	_, err = mgr.StartSession(project.ID, fullBranch, issueID, issueTitle, branchType)
-	if err != nil {
-		// Session creation failed, but git operations succeeded
-		// Print warning but don't fail
-		fmt.Printf("\nWarning: failed to save session: %v\n", err)
-		fmt.Println("Branch created, but session tracking is unavailable.")
-	} else {
-		fmt.Printf("\nStarted session on %s (%s)\n", fullBranch, branchType)
-		if issueID != "" {
-			fmt.Printf("Issue #%s · %s\n", issueID, issueTitle)
-		}
+	return startWorkflowConfig{
+		cwd: cwd, project: project, branch: branch, branchType: branchType,
+		issueID: issueID, issueTitle: issueTitle,
 	}
-
-	return nil
 }
 
 func resolveStartProject(ctx context.Context, mgr *session.Manager, database *db.DB, cwd string) (*db.Project, string, error) {

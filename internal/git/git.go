@@ -8,12 +8,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 )
+
+// commandWaitDelay bounds copier waits when descendants retain command pipes.
+const commandWaitDelay = time.Second
 
 // FileStatus represents one entry from `git status --porcelain`
 type FileStatus struct {
@@ -35,6 +39,7 @@ func Run(ctx context.Context, dir string, args ...string) (stdout string, stderr
 	}
 
 	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.WaitDelay = commandWaitDelay
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -143,6 +148,16 @@ func RunStream(ctx context.Context, dir string, args []string,
 		return fmt.Errorf("stderr pipe: %w", err)
 	}
 
+	kill := cmd.Cancel
+	cmd.Cancel = func() error {
+		err := kill()
+		// Descendants may retain the writers after git is killed.
+		// Closing readers is best-effort; Wait reports the command error.
+		_ = stdoutPipe.Close()
+		_ = stderrPipe.Close()
+		return err
+	}
+
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start git: %w", err)
 	}
@@ -175,7 +190,7 @@ func RunStream(ctx context.Context, dir string, args []string,
 		}
 	}()
 
-	// Wait for both streams to finish reading
+	// Drain both streams before Wait closes the readers on normal completion.
 	wg.Wait()
 
 	// Wait for process to exit
@@ -327,6 +342,29 @@ func Rebase(ctx context.Context, dir, upstream string) error {
 	return nil
 }
 
+// RebaseInProgress reports whether either rebase state path exists.
+// A false result is conclusive only when err is nil.
+func RebaseInProgress(ctx context.Context, dir string) (bool, error) {
+	for _, marker := range []string{"rebase-merge", "rebase-apply"} {
+		path, err := RunCombined(ctx, dir, "rev-parse", "--path-format=absolute", "--git-path", marker)
+		if err != nil {
+			return false, fmt.Errorf("resolve git path %s: %w", marker, err)
+		}
+		if !filepath.IsAbs(path) {
+			return false, fmt.Errorf("resolve git path %s: expected absolute path, got %q", marker, path)
+		}
+
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return false, fmt.Errorf("check git path %s: %w", marker, err)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 // RebaseOnto runs `git rebase --onto <newbase> <upstream> <branch>`
 func RebaseOnto(ctx context.Context, dir, newbase, upstream, branch string) error {
 	_, err := RunCombined(ctx, dir, "rebase", "--onto", newbase, upstream, branch)
@@ -356,11 +394,11 @@ func CheckoutNew(ctx context.Context, dir, branch string) error {
 
 // CurrentBranch returns the current branch name
 func CurrentBranch(ctx context.Context, dir string) (string, error) {
-	branch, err := RunCombined(ctx, dir, "rev-parse", "--abbrev-ref", "HEAD")
+	branch, err := RunCombined(ctx, dir, "rev-parse", "--symbolic-full-name", "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("get current branch failed: %w", err)
 	}
-	return branch, nil
+	return strings.TrimPrefix(branch, "refs/heads/"), nil
 }
 
 // DetectBaseBranch returns the preferred base branch for the repository.

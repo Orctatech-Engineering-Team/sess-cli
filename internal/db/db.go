@@ -130,6 +130,40 @@ func (db *DB) init() error {
 	CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id);
 	CREATE INDEX IF NOT EXISTS idx_sessions_state ON sessions(state);
 	CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time);
+
+	CREATE TABLE IF NOT EXISTS session_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		session_id INTEGER NOT NULL,
+		kind TEXT NOT NULL CHECK(kind IN (
+			'session_started', 'session_paused', 'session_resumed', 'session_ended'
+		)),
+		occurred_at DATETIME NOT NULL,
+		state TEXT NOT NULL CHECK(state IN ('active', 'paused', 'ended')),
+		total_elapsed INTEGER NOT NULL,
+		FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_session_events_session_id_id ON session_events(session_id, id);
+
+	CREATE TABLE IF NOT EXISTS end_workflows (
+		session_id INTEGER PRIMARY KEY,
+		branch TEXT NOT NULL,
+		base_branch TEXT NOT NULL,
+		commit_message TEXT NOT NULL,
+		end_without_pr BOOLEAN NOT NULL,
+		pr_title TEXT NOT NULL,
+		pr_body TEXT NOT NULL,
+		phase TEXT NOT NULL CHECK(phase IN (
+			'prepared', 'committed', 'rebased', 'pushed', 'pr_created', 'base_checked_out'
+		)),
+		head TEXT NOT NULL,
+		rebase_target TEXT NOT NULL DEFAULT '',
+		pr_number INTEGER,
+		pr_url TEXT NOT NULL,
+		repository TEXT NOT NULL DEFAULT '',
+		remote_id TEXT NOT NULL DEFAULT '',
+		FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+	);
 	`
 
 	if _, err := db.conn.Exec(schema); err != nil {
@@ -147,16 +181,20 @@ func (db *DB) init() error {
 // runMigrations applies schema changes to existing databases
 func (db *DB) runMigrations() error {
 	migrations := []struct {
+		table      string
 		column     string
 		definition string
 	}{
-		{column: "current_slice_start", definition: "DATETIME"},
-		{column: "pr_number", definition: "INTEGER"},
-		{column: "pr_url", definition: "TEXT"},
+		{table: "sessions", column: "current_slice_start", definition: "DATETIME"},
+		{table: "sessions", column: "pr_number", definition: "INTEGER"},
+		{table: "sessions", column: "pr_url", definition: "TEXT"},
+		{table: "end_workflows", column: "rebase_target", definition: "TEXT NOT NULL DEFAULT ''"},
+		{table: "end_workflows", column: "repository", definition: "TEXT NOT NULL DEFAULT ''"},
+		{table: "end_workflows", column: "remote_id", definition: "TEXT NOT NULL DEFAULT ''"},
 	}
 
 	for _, migration := range migrations {
-		exists, err := db.hasSessionsColumn(migration.column)
+		exists, err := db.hasColumn(migration.table, migration.column)
 		if err != nil {
 			return fmt.Errorf("failed to check for %s column: %w", migration.column, err)
 		}
@@ -164,7 +202,7 @@ func (db *DB) runMigrations() error {
 			continue
 		}
 
-		query := fmt.Sprintf("ALTER TABLE sessions ADD COLUMN %s %s", migration.column, migration.definition)
+		query := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", migration.table, migration.column, migration.definition)
 		if _, err := db.conn.Exec(query); err != nil {
 			return fmt.Errorf("failed to add %s column: %w", migration.column, err)
 		}
@@ -173,12 +211,12 @@ func (db *DB) runMigrations() error {
 	return nil
 }
 
-func (db *DB) hasSessionsColumn(name string) (bool, error) {
+func (db *DB) hasColumn(table, name string) (bool, error) {
 	var count int
 	err := db.conn.QueryRow(`
-		SELECT COUNT(*) FROM pragma_table_info('sessions')
+		SELECT COUNT(*) FROM pragma_table_info(?)
 		WHERE name = ?
-	`, name).Scan(&count)
+	`, table, name).Scan(&count)
 	if err != nil {
 		return false, err
 	}
@@ -382,6 +420,32 @@ func (db *DB) UpdateSession(s *Session) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update session: %w", err)
+	}
+	return nil
+}
+
+// CompleteSession ends only the expected session snapshot and clears its checkpoint.
+func (db *DB) CompleteSession(before, after *Session) error {
+	if before == nil || after == nil {
+		return fmt.Errorf("complete session: before and after are required")
+	}
+	if after.State != StateEnded || after.EndTime == nil || after.CurrentSliceStart != nil {
+		return fmt.Errorf("complete session %d: require ended state, end time, and no active slice", after.ID)
+	}
+
+	if err := db.TransitionSession(before, after); err != nil {
+		return fmt.Errorf("complete session %d: %w", after.ID, err)
+	}
+	return nil
+}
+
+func requireOneRow(result sql.Result) error {
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("check affected rows: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("affected %d rows, want 1", rows)
 	}
 	return nil
 }

@@ -68,13 +68,9 @@ func (m *Manager) StartSession(projectID int64, branch, issueID, issueTitle, bra
 		CurrentSliceStart: &now, // Track current slice start time
 	}
 
-	created, err := m.db.CreateSession(session)
+	created, err := m.db.CreateTrackedSession(session)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
-	}
-
-	if err := m.touchProject(projectID); err != nil {
-		return nil, err
 	}
 
 	return created, nil
@@ -103,6 +99,8 @@ func (m *Manager) PauseSession(projectID int64) (*db.Session, error) {
 		return nil, fmt.Errorf("session is in invalid state: missing slice start time")
 	}
 
+	before := *session
+
 	// Compute elapsed time for current slice with nanosecond precision
 	now := time.Now()
 	elapsed := now.Sub(*session.CurrentSliceStart)
@@ -113,11 +111,8 @@ func (m *Manager) PauseSession(projectID int64) (*db.Session, error) {
 	session.PauseTime = &now
 	session.CurrentSliceStart = nil // Clear slice start when paused
 
-	if err := m.db.UpdateSession(session); err != nil {
+	if err := m.db.TransitionSession(&before, session); err != nil {
 		return nil, fmt.Errorf("failed to pause session: %w", err)
-	}
-	if err := m.touchProject(projectID); err != nil {
-		return nil, err
 	}
 
 	return session, nil
@@ -133,17 +128,15 @@ func (m *Manager) ResumeSession(projectID int64) (*db.Session, error) {
 		return nil, fmt.Errorf("no paused session found")
 	}
 
+	before := *session
 	now := time.Now()
 
 	// Update state and start new slice
 	session.State = db.StateActive
 	session.CurrentSliceStart = &now
 
-	if err := m.db.UpdateSession(session); err != nil {
+	if err := m.db.TransitionSession(&before, session); err != nil {
 		return nil, fmt.Errorf("failed to resume session: %w", err)
-	}
-	if err := m.touchProject(projectID); err != nil {
-		return nil, err
 	}
 
 	return session, nil
@@ -164,6 +157,43 @@ func (m *Manager) CompleteSession(projectID int64, prNumber *int64, prURL string
 		return nil, fmt.Errorf("no active session found")
 	}
 
+	return m.completeSession(session, prNumber, prURL)
+}
+
+// CompleteEndWorkflow ends only the session identified by the current saved checkpoint.
+func (m *Manager) CompleteEndWorkflow(projectID int64, workflow *db.EndWorkflow) (*db.Session, error) {
+	if workflow == nil {
+		return nil, fmt.Errorf("complete end workflow: workflow is nil")
+	}
+	session, err := m.db.GetActiveSession(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("complete end workflow for session %d: get active session: %w", workflow.SessionID, err)
+	}
+	if session == nil || session.ID != workflow.SessionID || session.Branch != workflow.Branch {
+		return nil, fmt.Errorf("complete end workflow for session %d on branch %q: active session identity changed",
+			workflow.SessionID, workflow.Branch)
+	}
+	saved, err := m.db.GetEndWorkflow(workflow.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("complete end workflow for session %d: get checkpoint: %w", workflow.SessionID, err)
+	}
+	if saved == nil {
+		return nil, fmt.Errorf("complete end workflow for session %d: checkpoint missing", workflow.SessionID)
+	}
+	expected, actual := *workflow, *saved
+	samePRNumber := expected.PRNumber == nil && actual.PRNumber == nil
+	if expected.PRNumber != nil && actual.PRNumber != nil {
+		samePRNumber = *expected.PRNumber == *actual.PRNumber
+	}
+	expected.PRNumber, actual.PRNumber = nil, nil
+	if expected != actual || !samePRNumber {
+		return nil, fmt.Errorf("complete end workflow for session %d: checkpoint changed", workflow.SessionID)
+	}
+	return m.completeSession(session, workflow.PRNumber, workflow.PRURL)
+}
+
+func (m *Manager) completeSession(session *db.Session, prNumber *int64, prURL string) (*db.Session, error) {
+	before := *session
 	now := time.Now()
 
 	// Commit any in-progress slice
@@ -179,11 +209,8 @@ func (m *Manager) CompleteSession(projectID int64, prNumber *int64, prURL string
 	session.PRNumber = prNumber
 	session.PRURL = prURL
 
-	if err := m.db.UpdateSession(session); err != nil {
+	if err := m.db.CompleteSession(&before, session); err != nil {
 		return nil, fmt.Errorf("failed to end session: %w", err)
-	}
-	if err := m.touchProject(projectID); err != nil {
-		return nil, err
 	}
 
 	return session, nil
@@ -236,6 +263,8 @@ func (m *Manager) SyncActiveSession(projectID int64) (*db.Session, error) {
 		return nil, fmt.Errorf("active session has no slice start time")
 	}
 
+	before := *session
+
 	// Calculate and commit current slice
 	now := time.Now()
 	elapsed := now.Sub(*session.CurrentSliceStart)
@@ -244,26 +273,9 @@ func (m *Manager) SyncActiveSession(projectID int64) (*db.Session, error) {
 	// Restart slice from now
 	session.CurrentSliceStart = &now
 
-	if err := m.db.UpdateSession(session); err != nil {
+	if err := m.db.SyncSession(&before, session); err != nil {
 		return nil, fmt.Errorf("failed to sync session: %w", err)
 	}
 
 	return session, nil
-}
-
-func (m *Manager) touchProject(projectID int64) error {
-	project, err := m.db.GetProjectByID(projectID)
-	if err != nil {
-		return fmt.Errorf("failed to get project: %w", err)
-	}
-	if project == nil {
-		return fmt.Errorf("project %d not found", projectID)
-	}
-
-	project.LastUsedAt = time.Now()
-	if err := m.db.UpdateProject(project); err != nil {
-		return fmt.Errorf("failed to update project: %w", err)
-	}
-
-	return nil
 }

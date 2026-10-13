@@ -22,6 +22,14 @@ If you want to understand the workflow and mental model:
 
 - [Explanation: How SESS works](explanation/how-sess-works.md)
 
+## Vision and Strategy
+
+These docs describe where SESS is heading and why:
+
+- [Vision](VISION.md) — north star, principles, and what SESS is becoming
+- [Roadmap](ROADMAP.md) — phased plan from current state to long-term goals
+- [Design decisions](DESIGN-DECISIONS.md) — architectural and design choices that guide the project
+
 ## Contributor Docs
 
 These docs are aimed at contributors and maintainers:

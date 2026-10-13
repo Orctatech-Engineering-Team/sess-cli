@@ -72,6 +72,19 @@ Current test coverage is focused on:
 - `internal/session`
 - `internal/sess`
 - `internal/tui` helper logic
+- `internal/git` integration checks
+
+Git and end-workflow integration tests use disposable repositories and local
+remotes. GitHub calls use a fake `gh`; they do not contact GitHub or use your
+session database. Run them with:
+
+```bash
+go test -tags=integration ./...
+go test -race -tags=integration ./...
+```
+
+POSIX hook and fake-`gh` fixtures are skipped on Windows. CI runs the tagged
+suite on all supported runner platforms and race checks on Linux.
 
 When changing lifecycle behavior, add coverage for:
 

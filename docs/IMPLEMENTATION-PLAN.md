@@ -2,7 +2,68 @@
 
 This document turns the current code review findings into an execution plan. It focuses on fixing correctness issues first, then closing the most important product gaps, then cleaning up quality and maintainability.
 
+## Current Milestone: Interrupted `sess end` Recovery
+
+The numbered phases below preserve the original implementation backlog; several
+items, including `sess end` and lifecycle tests, are already implemented.
+
+### First slice: guarded retries (implemented)
+
+- Detect an unfinished rebase before checkout, prompts, staging, or commits.
+- Leave the session's active or paused state unchanged when recovery is needed.
+- Explain how to resolve, stage, and continue a rebase, or abort it.
+- Retry the normal handoff after Git recovery; reuse an existing open PR without
+  asking for its description again.
+- Cancel and wait for the running workflow when the end UI exits.
+- Cover rebase resolution, rejected pushes, PR failures, and checkout failures
+  with disposable repositories and a fake GitHub CLI.
+- Run the integration suite in CI and fail the build when tests fail.
+
+Acceptance: a conflicting end attempt leaves the session open and the conflict
+intact. After `git rebase --continue` finishes, `sess end` can push, create or reuse
+the PR, return to the base branch, and persist completion.
+
+Validation commands are documented in [DEVELOPMENT.md](DEVELOPMENT.md).
+
+### Second slice: durable handoff (implemented)
+
+- Save prompt inputs, session/repository identity, commit heads, and completed
+  phases before proceeding to the next side effect.
+- Resume across process restarts without repeating completed commit, push, or PR
+  creation steps.
+- Reconcile matching open or merged PRs; stop on closed-unmerged PRs or uncertain
+  GitHub state.
+- Reject changed origin destinations and unexpected local/remote history.
+- Complete the session, touch project activity, and remove its checkpoint in one
+  SQLite transaction. Retain the checkpoint on failure.
+
+### Third slice: start persistence recovery (implemented)
+
+- Report failure when branch creation succeeds but session persistence fails.
+- Preserve the branch and working tree for explicit adoption on retry.
+- Offer interactive adoption with reselected issue context, and
+  `sess start --adopt <branch>` without issue metadata.
+- Reject unsafe branch/rebase state and cancel the running start workflow on UI exit.
+- Save the session and start event atomically; do not reconstruct time from a
+  failed attempt.
+
+End recovery does not automatically resolve, continue, or abort rebases, does
+not force-push rewritten branches, and does not add auth or dashboard features.
+
 ## Phase 1: Correctness and Workflow Safety
+
+### Lifecycle journal and detail history (implemented)
+
+- Record successful start, pause, resume, and end transitions alongside session
+  state and project activity in one transaction.
+- Guard stale/repeated transitions and timer syncs against overwriting newer state.
+- Preserve existing totals without fabricating legacy events.
+- Expose `sess history <session-id>` with recorded events and active intervals,
+  including explicit incomplete-history labels.
+
+Following analytics work can add date-range reports from recorded intervals.
+Cross-project overlap needs an explicit policy before reporting unique work
+time or context-switch metrics.
 
 These items should be done first because they can leave users in the wrong repo state or make core commands fail in common repositories.
 

@@ -65,6 +65,59 @@ Instead, it stores:
 
 This allows pause and resume to preserve timing accurately.
 
+## Lifecycle Journal
+
+The session record remains authoritative for current state and elapsed totals.
+The append-only `session_events` journal records successful transitions:
+
+- `session_started`
+- `session_paused`
+- `session_resumed`
+- `session_ended`
+
+Each event records its ordered ID, session ID, UTC timestamp, resulting state,
+and accumulated elapsed nanoseconds. Event ID determines ordering even when
+timestamps are equal.
+
+Session state, its lifecycle event, and project activity commit in one
+transaction. Completion also removes the matching end checkpoint in that
+transaction. Failed or repeated transitions do not append events. Timer syncs
+are accounting updates, not lifecycle transitions.
+
+Existing sessions receive no fabricated events during migration. Their totals
+remain available, but detailed history is unavailable until observed transitions
+are recorded, and then remains partial if the start was not recorded.
+
+`sess history <session-id>` derives intervals only from recorded start/resume
+events and their subsequent pause/end events. An active session may have an
+ongoing interval. Missing history is not inferred from aggregate totals.
+Backward timestamps mark the timeline incomplete rather than creating negative
+interval durations.
+
+Tracked active time is not measured focus time. Different projects can have
+overlapping active sessions; their summed durations are not unique working time.
+
+## End Workflow Checkpoint
+
+An interrupted end attempt retains the session's active or paused state.
+Its separate `end_workflows` record stores:
+
+- session ID, branch, and saved base branch
+- commit message, PR title/body, and no-PR choice
+- canonical GitHub repository and an origin URL fingerprint
+- expected branch head and immutable rebase target
+- discovered PR number and URL
+- last completed phase: `prepared`, `committed`, `rebased`, `pushed`,
+  `pr_created`, or `base_checked_out`
+
+Prompt inputs and identity remain fixed across retries. Git and GitHub state
+must match the checkpoint before recovery continues. The raw origin URL is not
+stored in the checkpoint.
+
+Successful completion updates the session and project activity and deletes the
+matching checkpoint in one SQLite transaction. A failed transaction retains all
+three previous records.
+
 ## Base Branch
 
 Each tracked project has a base branch.

@@ -47,6 +47,25 @@ Available actions:
 
 Choose `Discard changes` only when you want to remove tracked and untracked changes from the working tree.
 
+## Track an Existing Local Branch
+
+Inspect the branch and current session first:
+
+```bash
+git status
+sess status
+sess start --adopt feature/my-change
+```
+
+Adoption starts a new session without issue metadata. It preserves the branch's
+commits and working tree, and does not fetch, pull, reset, or recreate the branch.
+If you are on a different dirty branch, switch manually before adopting.
+
+To select issue context instead, run the usual interactive start flow with the
+same issue/name and branch type, then choose `Track existing branch`.
+The branch must exist locally and must not be the project's base branch.
+An existing active or paused session must be handled first.
+
 ## Check the Current Session
 
 Run:
@@ -111,7 +130,34 @@ Choose `End session anyway` when you want to close out the session without creat
 
 If an open PR already exists for the session branch, `sess end` reuses it instead of creating another one.
 
-You still go through the normal branch alignment, push, and session completion flow.
+SESS skips the PR summary, testing, and notes prompts for an existing open PR.
+You still go through the normal branch alignment, rebase, push, and session
+completion flow.
+
+## Recover From an Interrupted End
+
+If a rebase conflicts, the session stays open. Resolve the files, stage them with
+`git add <resolved-files>`, and run `git rebase --continue`. Repeat until Git
+finishes the rebase, then rerun `sess end`.
+
+While the rebase is unfinished, `sess end` stops before branch checkout or
+committing. To abandon the rebase instead, run `git rebase --abort`; this leaves
+the session open.
+
+For push, GitHub, or checkout failures, fix the reported problem and rerun
+`sess end`. SESS restores saved commit/PR details and resumes from its saved
+checkpoint. Completed phases are not repeated.
+
+A matching open PR is reused. A matching merged PR proceeds to local cleanup.
+A closed, unmerged PR leaves the session open; inspect it and reopen it before
+retrying. Authentication errors, uncertain PR identity, changed origin URLs, and
+unexpected branch history also stop recovery without ending the session.
+
+If checkout succeeded but saving completion failed, rerun `sess end` from the
+saved base branch. SESS saves completion and removes the checkpoint together.
+If that save fails, both stay unchanged.
+
+See [Troubleshoot common problems](troubleshooting.md) for recovery details.
 
 ## Keep or Delete the Local Branch
 
@@ -136,3 +182,27 @@ This shows:
 - whether each is idle, active, or paused
 - the active branch when present
 - recent activity timing
+
+## Inspect a Session's Lifecycle
+
+Find its ID in the history list:
+
+```bash
+sess history
+# Or list sessions across tracked projects:
+sess history --all
+```
+
+Then inspect that ID:
+
+```bash
+sess history 42
+```
+
+The detail view shows successful lifecycle events and recorded active intervals,
+including an ongoing interval when applicable. Timestamps are UTC. The ID lookup
+also works outside the project directory.
+
+Older sessions keep their tracked totals but may have no recorded lifecycle
+history. A session that started before journaling was available has partial
+history even if subsequent pauses, resumes, or completion are recorded.

@@ -2,7 +2,10 @@ package sess
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Orctatech-Engineering-Team/Sess/internal/db"
@@ -14,10 +17,23 @@ var historyLimit int
 var historyAll bool
 
 var historyCmd = &cobra.Command{
-	Use:   "history",
+	Use:   "history [session-id]",
 	Short: "Show recent session history",
-	Long:  "Display recent sessions for the tracked project in the current directory or across all tracked projects.",
+	Long: "Display recent sessions for the tracked project in the current directory or across all tracked projects.\n" +
+		"Pass a session ID to show its recorded lifecycle and active intervals from any directory.",
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var sessionID int64
+		if len(args) == 1 {
+			id, err := strconv.ParseInt(args[0], 10, 64)
+			if err != nil || id <= 0 {
+				return fmt.Errorf("session ID must be a positive integer")
+			}
+			if cmd.Flags().Changed("all") || cmd.Flags().Changed("limit") {
+				return fmt.Errorf("--all and --limit cannot be used with a session ID")
+			}
+			sessionID = id
+		}
 		if historyLimit < 1 {
 			return fmt.Errorf("history limit must be at least 1")
 		}
@@ -34,6 +50,18 @@ var historyCmd = &cobra.Command{
 		defer database.Close()
 
 		mgr := session.NewManager(database)
+
+		if sessionID != 0 {
+			timeline, err := mgr.GetSessionTimeline(sessionID)
+			if err != nil {
+				return fmt.Errorf("failed to get session timeline: %w", err)
+			}
+			elapsed := time.Duration(timeline.Session.TotalElapsed)
+			if timeline.Session.State == db.StateActive {
+				elapsed = mgr.GetCurrentElapsed(timeline.Session)
+			}
+			return renderSessionTimeline(cmd.OutOrStdout(), timeline, elapsed)
+		}
 
 		if historyAll {
 			entries, err := mgr.GetGlobalSessionHistory(historyLimit)
@@ -95,11 +123,62 @@ var historyCmd = &cobra.Command{
 	},
 }
 
+func renderSessionTimeline(w io.Writer, timeline *session.SessionTimeline, elapsed time.Duration) error {
+	var output strings.Builder
+	sess := timeline.Session
+	fmt.Fprintf(&output, "Session %d · %s\n", sess.ID, formatBranchDisplay(sess))
+	fmt.Fprintf(&output, "%s · tracked active total %s\n", sess.State, formatDuration(elapsed))
+
+	switch {
+	case len(timeline.Events) == 0:
+		fmt.Fprintln(&output, "No recorded lifecycle history · tracked total preserved")
+	case timeline.HistoryComplete:
+		fmt.Fprintln(&output, "Lifecycle history complete")
+	default:
+		fmt.Fprintln(&output, "Lifecycle history incomplete · tracked total preserved")
+	}
+
+	if len(timeline.Events) > 0 {
+		fmt.Fprintln(&output, "\nRecorded events")
+		for _, event := range timeline.Events {
+			fmt.Fprintf(
+				&output,
+				"  %s · %s · elapsed %s\n",
+				event.OccurredAt.UTC().Format(time.RFC3339Nano),
+				strings.TrimPrefix(event.Kind, "session_"),
+				formatDuration(time.Duration(event.TotalElapsed)),
+			)
+		}
+	}
+
+	if len(timeline.Intervals) > 0 {
+		fmt.Fprintln(&output, "\nActive intervals")
+		for _, interval := range timeline.Intervals {
+			end := "ongoing"
+			if interval.End != nil {
+				end = interval.End.UTC().Format(time.RFC3339Nano)
+			}
+			fmt.Fprintf(
+				&output,
+				"  %s → %s · %s\n",
+				interval.Start.UTC().Format(time.RFC3339Nano),
+				end,
+				formatDuration(interval.Duration),
+			)
+		}
+	}
+
+	if _, err := io.WriteString(w, output.String()); err != nil {
+		return fmt.Errorf("failed to write session timeline: %w", err)
+	}
+	return nil
+}
+
 func printHistoryEntry(mgr *session.Manager, projectName string, sess *db.Session) {
 	if projectName != "" {
-		fmt.Printf("%s · %s\n", projectName, formatBranchDisplay(sess))
+		fmt.Printf("%s · %s · session %d\n", projectName, formatBranchDisplay(sess), sess.ID)
 	} else {
-		fmt.Println(formatBranchDisplay(sess))
+		fmt.Printf("%s · session %d\n", formatBranchDisplay(sess), sess.ID)
 	}
 
 	elapsed := time.Duration(sess.TotalElapsed)

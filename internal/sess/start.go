@@ -16,8 +16,16 @@ import (
 var startCmd = &cobra.Command{
 	Use:   "start [feature-name]",
 	Short: "Start a new session",
-	Long:  "Start a new work session, optionally linked to a GitHub issue. Creates a feature branch and tracks time.",
+	Long: "Start a new work session, optionally linked to a GitHub issue. Creates a feature branch and tracks time.\n" +
+		"Use --adopt <branch> to start a new tracked session on an existing exact local branch without an issue.\n" +
+		"Adoption does not fetch, reset, or pull and cannot be combined with a feature name.",
+	Args: validateStartArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		adoptBranch, err := cmd.Flags().GetString("adopt")
+		if err != nil {
+			return err
+		}
+
 		// Get current directory
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -36,6 +44,10 @@ var startCmd = &cobra.Command{
 		}
 		defer database.Close()
 
+		if cmd.Flags().Changed("adopt") {
+			return tui.RunAdoptStart(cwd, database, adoptBranch)
+		}
+
 		// Pass database to TUI
 		featureName := ""
 		if len(args) > 0 {
@@ -46,6 +58,27 @@ var startCmd = &cobra.Command{
 	},
 }
 
+func validateStartArgs(cmd *cobra.Command, args []string) error {
+	if err := cobra.MaximumNArgs(1)(cmd, args); err != nil {
+		return err
+	}
+	if !cmd.Flags().Changed("adopt") {
+		return nil
+	}
+	branch, err := cmd.Flags().GetString("adopt")
+	if err != nil {
+		return err
+	}
+	if branch == "" {
+		return fmt.Errorf("--adopt requires a non-empty branch name")
+	}
+	if len(args) != 0 {
+		return fmt.Errorf("--adopt cannot be combined with a feature name")
+	}
+	return nil
+}
+
 func init() {
+	startCmd.Flags().String("adopt", "", "Start a new session on an existing exact local branch without an issue")
 	rootCmd.AddCommand(startCmd)
 }

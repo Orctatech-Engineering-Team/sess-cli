@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,11 +24,23 @@ type Issue struct {
 
 // PR represents a GitHub pull request with the fields used by SESS.
 type PR struct {
-	Number int    `json:"number"`
-	URL    string `json:"url"`
-	Title  string `json:"title"`
-	State  string `json:"state"`
+	Number         int    `json:"number"`
+	URL            string `json:"url"`
+	Title          string `json:"title"`
+	State          string `json:"state"`
+	BaseRefName    string `json:"baseRefName"`
+	HeadRefName    string `json:"headRefName"`
+	HeadRefOid     string `json:"headRefOid"`
+	HeadRepository struct {
+		Name string `json:"name"`
+	} `json:"headRepository"`
+	HeadRepositoryOwner struct {
+		Login string `json:"login"`
+	} `json:"headRepositoryOwner"`
 }
+
+const recoveryPRFields = "number,url,title,state,baseRefName,headRefName,headRefOid,headRepository,headRepositoryOwner"
+const recoveryPRLimit = 100
 
 // NewGH creates a new GH instance
 func NewGH() *GH {
@@ -42,6 +56,7 @@ func (g *GH) Run(ctx context.Context, dir string, args ...string) (stdout string
 	}
 
 	cmd := exec.CommandContext(ctx, "gh", args...)
+	cmd.WaitDelay = commandWaitDelay
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -81,6 +96,29 @@ func (g *GH) CreatePR(ctx context.Context, dir, title, body, base string) (strin
 	return out, nil
 }
 
+// CreatePRForHead creates a PR in an explicit repository without implicit pushing or forking.
+func (g *GH) CreatePRForHead(
+	ctx context.Context,
+	dir, title, body, base, head, repository string,
+) (string, error) {
+	if strings.TrimSpace(head) == "" {
+		return "", fmt.Errorf("PR head branch must be nonempty")
+	}
+	if _, _, err := recoveryRepositoryParts([]string{repository}); err != nil {
+		return "", err
+	}
+	args := []string{"pr", "create", "--title", title, "--body", body}
+	if base != "" {
+		args = append(args, "--base", base)
+	}
+	args = append(args, "--head", head, "--repo", repository)
+	out, err := g.RunCombined(ctx, dir, args...)
+	if err != nil {
+		return "", fmt.Errorf("create PR failed: %w", err)
+	}
+	return out, nil
+}
+
 // FindOpenPRByHead returns the first open PR for the given branch, if any.
 func (g *GH) FindOpenPRByHead(ctx context.Context, dir, branch string) (*PR, error) {
 	out, err := g.RunCombined(ctx, dir, "pr", "list", "--head", branch, "--state", "open", "--json", "number,url,title,state")
@@ -97,6 +135,138 @@ func (g *GH) FindOpenPRByHead(ctx context.Context, dir, branch string) (*PR, err
 	}
 
 	return &prs[0], nil
+}
+
+// GetPR returns a specific PR, including closed and merged PRs.
+// An optional HOST/OWNER/NAME repository scopes the lookup and requires a same-repository head.
+func (g *GH) GetPR(ctx context.Context, dir string, number int, repository ...string) (*PR, error) {
+	if number <= 0 {
+		return nil, fmt.Errorf("PR number must be positive: %d", number)
+	}
+	owner, name, err := recoveryRepositoryParts(repository)
+	if err != nil {
+		return nil, err
+	}
+	args := []string{"pr", "view", strconv.Itoa(number), "--json", recoveryPRFields}
+	if len(repository) != 0 {
+		args = append(args, "--repo", repository[0])
+	}
+	out, err := g.RunCombined(ctx, dir, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get PR #%d failed: %w", number, err)
+	}
+
+	var pr PR
+	if err := json.Unmarshal([]byte(out), &pr); err != nil {
+		return nil, fmt.Errorf("failed to parse PR JSON: %w", err)
+	}
+	if err := validateRecoveryPR(pr); err != nil {
+		return nil, fmt.Errorf("get PR #%d: %w", number, err)
+	}
+	if pr.Number != number {
+		return nil, fmt.Errorf("get PR #%d returned PR #%d", number, pr.Number)
+	}
+	if len(repository) != 0 && !recoveryPRHeadMatches(pr, owner, name) {
+		return nil, fmt.Errorf("PR #%d head repository does not match %q", number, repository[0])
+	}
+	return &pr, nil
+}
+
+// FindPRByHead returns the unique PR for a head/base pair across all states.
+// Ambiguous or potentially truncated results are errors.
+func (g *GH) FindPRByHead(
+	ctx context.Context,
+	dir, branch, base string,
+	repository ...string,
+) (*PR, error) {
+	if strings.TrimSpace(branch) == "" || strings.TrimSpace(base) == "" {
+		return nil, fmt.Errorf("PR head and base branches must be nonempty")
+	}
+	owner, name, err := recoveryRepositoryParts(repository)
+	if err != nil {
+		return nil, err
+	}
+	args := []string{
+		"pr", "list", "--head", branch, "--base", base,
+		"--state", "all", "--limit", strconv.Itoa(recoveryPRLimit), "--json", recoveryPRFields,
+	}
+	if len(repository) != 0 {
+		args = append(args, "--repo", repository[0])
+	}
+	out, err := g.RunCombined(ctx, dir, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list PRs by head and base failed: %w", err)
+	}
+
+	var prs []PR
+	if err := json.Unmarshal([]byte(out), &prs); err != nil {
+		return nil, fmt.Errorf("failed to parse PR list JSON: %w", err)
+	}
+	if prs == nil {
+		return nil, fmt.Errorf("PR list JSON must be an array")
+	}
+	if len(prs) >= recoveryPRLimit {
+		return nil, fmt.Errorf("PR list reached limit %d; completeness is uncertain", recoveryPRLimit)
+	}
+
+	var match *PR
+	for i := range prs {
+		pr := &prs[i]
+		if err := validateRecoveryPR(*pr); err != nil {
+			return nil, fmt.Errorf("PR list entry %d: %w", i+1, err)
+		}
+		if pr.HeadRefName != branch || pr.BaseRefName != base {
+			continue
+		}
+		if len(repository) != 0 && !recoveryPRHeadMatches(*pr, owner, name) {
+			continue
+		}
+		if match != nil {
+			return nil, fmt.Errorf("ambiguous PRs for head %q and base %q", branch, base)
+		}
+		match = pr
+	}
+	return match, nil
+}
+
+func recoveryRepositoryParts(repository []string) (owner, name string, err error) {
+	if len(repository) == 0 {
+		return "", "", nil
+	}
+	if len(repository) != 1 {
+		return "", "", fmt.Errorf("expected at most one repository")
+	}
+	parts := strings.Split(repository[0], "/")
+	if len(parts) != 3 {
+		return "", "", fmt.Errorf("repository must use HOST/OWNER/NAME: %q", repository[0])
+	}
+	for _, part := range parts {
+		if part == "" || strings.ContainsAny(part, " \t\r\n?#@\\:") {
+			return "", "", fmt.Errorf("invalid repository: %q", repository[0])
+		}
+	}
+	return parts[1], parts[2], nil
+}
+
+func recoveryPRHeadMatches(pr PR, owner, name string) bool {
+	return strings.EqualFold(pr.HeadRepositoryOwner.Login, owner) &&
+		strings.EqualFold(pr.HeadRepository.Name, name)
+}
+
+func validateRecoveryPR(pr PR) error {
+	if pr.Number <= 0 || strings.TrimSpace(pr.URL) == "" {
+		return fmt.Errorf("invalid PR number or URL")
+	}
+	missingRefs := strings.TrimSpace(pr.BaseRefName) == "" || strings.TrimSpace(pr.HeadRefName) == ""
+	if missingRefs || strings.TrimSpace(pr.HeadRefOid) == "" {
+		return fmt.Errorf("PR #%d has missing branch or head commit metadata", pr.Number)
+	}
+	switch pr.State {
+	case "OPEN", "CLOSED", "MERGED":
+		return nil
+	default:
+		return fmt.Errorf("PR #%d has unrecognized state %q", pr.Number, pr.State)
+	}
 }
 
 // ListPRs lists pull requests
@@ -210,6 +380,41 @@ func (g *GH) RepoView(ctx context.Context, dir string) (string, error) {
 		return "", fmt.Errorf("repo view failed: %w", err)
 	}
 	return out, nil
+}
+
+// ResolveRepository resolves an explicit remote URL to canonical HOST/OWNER/NAME.
+func (g *GH) ResolveRepository(ctx context.Context, dir, remoteURL string) (string, error) {
+	if strings.TrimSpace(remoteURL) == "" || strings.HasPrefix(remoteURL, "-") {
+		return "", fmt.Errorf("repository remote URL must be explicit and nonempty")
+	}
+	out, err := g.RunCombined(ctx, dir, "repo", "view", remoteURL, "--json", "nameWithOwner,url")
+	if err != nil {
+		return "", fmt.Errorf("resolve repository failed: %w", err)
+	}
+	var repo struct {
+		NameWithOwner string `json:"nameWithOwner"`
+		URL           string `json:"url"`
+	}
+	if err := json.Unmarshal([]byte(out), &repo); err != nil {
+		return "", fmt.Errorf("failed to parse repository JSON: %w", err)
+	}
+	u, err := url.Parse(repo.URL)
+	if err != nil {
+		return "", fmt.Errorf("invalid resolved repository URL: %w", err)
+	}
+	validScheme := u.Scheme == "https" || u.Scheme == "http"
+	hasExtras := u.User != nil || u.RawQuery != "" || u.Fragment != ""
+	if !validScheme || u.Host == "" || hasExtras {
+		return "", fmt.Errorf("invalid resolved repository URL: %q", repo.URL)
+	}
+	if strings.Trim(u.Path, "/") != repo.NameWithOwner {
+		return "", fmt.Errorf("resolved repository name and URL do not match")
+	}
+	repository := u.Host + "/" + repo.NameWithOwner
+	if _, _, err := recoveryRepositoryParts([]string{repository}); err != nil {
+		return "", fmt.Errorf("invalid resolved repository: %w", err)
+	}
+	return repository, nil
 }
 
 // RepoClone clones a repository

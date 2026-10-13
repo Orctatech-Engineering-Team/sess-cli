@@ -34,9 +34,12 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
-      - name: Run tests (when available)
-        run: go test -v ./...
-        continue-on-error: true  # Don't fail build if no tests yet
+      - name: Run tests
+        run: go test -v -tags=integration ./...
+
+      - name: Run race checks
+        if: matrix.os == 'ubuntu-latest'
+        run: go test -race -tags=integration ./...
 
       - name: Upload build artifacts
         if: matrix.os == 'ubuntu-latest'

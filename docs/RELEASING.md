@@ -36,10 +36,18 @@ git pull origin main
 
 Update any release-facing docs that changed materially:
 
+- `CHANGELOG.md`: add a section matching the release tag, with its release date
 - `README.md`
 - `docs/README.md`
 - user-facing install or workflow docs under `docs/`
 - milestone or roadmap docs when a phase boundary changes
+
+The release workflow reads that changelog section into the release notes and
+stops if it is missing. It also runs vet and race-enabled integration tests
+before building the archives.
+
+Push the release commit first and wait for the Build workflow to pass on Linux,
+macOS, and Windows. Tag that same commit only after those checks pass.
 
 ### 3. Create and Push a Version Tag
 

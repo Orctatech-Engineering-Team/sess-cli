@@ -18,6 +18,7 @@ Starts a new session in the current repository.
 ```bash
 sess start
 sess start user-profile-page
+sess start --adopt feature/user-profile-page
 ```
 
 ### Behavior
@@ -28,8 +29,25 @@ sess start user-profile-page
 - repairs an invalid stored base branch before branch creation
 - optionally loads GitHub issues through `gh`
 - prompts for dirty working tree handling before branch creation
-- checks out and pulls the tracked base branch before creating the session branch
+- checks out the tracked base branch, fetches it from origin, and updates it fast-forward-only before creating the session branch
+- refuses to overwrite ignored files during checkout or base updates
 - creates a new active session in the local SQLite database
+- reports success only after the session and its start event are saved together
+- fails during an unfinished rebase
+
+If the selected branch already exists locally, the interactive flow offers
+`Track existing branch` before dirty-worktree handling. This starts a new session
+using the selected issue context without recreating or updating the branch.
+
+`--adopt <branch>` selects an exact existing local branch without prompts or issue
+metadata. It cannot be combined with a feature name. Adoption does not fetch,
+pull, reset, or create a branch; it rejects the project's base branch and
+remote-only branches. Uncommitted work is preserved on the selected branch.
+If another branch is checked out and dirty, switch manually before adopting.
+
+If session persistence fails after branch creation, the command fails and leaves
+the branch intact. Inspect `sess status` before retrying; see
+[start recovery](../how-to/troubleshooting.md#branch-created-but-session-start-failed).
 
 ## `sess status`
 
@@ -139,16 +157,21 @@ Shows recent session history for the tracked project in the current directory.
 sess history
 sess history --limit 20
 sess history --all
+sess history 42
 ```
 
 ### Behavior
 
-- fails if the current directory is not a tracked project
+- the default list requires the current directory to be a tracked project
 - `--all` shows recent sessions across all tracked projects instead of the current directory
 - shows the newest sessions first
 - includes active, paused, and ended sessions
-- shows elapsed time, issue metadata, and PR metadata when available
+- shows session IDs, elapsed time, issue metadata, and PR metadata when available
 - limits output to the most recent sessions, defaulting to 10
+- a positive session ID shows that session's recorded events and active intervals
+- detail lookup works outside a tracked project; IDs belong to the local database
+- detail mode cannot be combined with `--all` or an explicitly supplied `--limit`
+- detail timestamps are exact UTC timestamps; legacy or partial history is labeled
 
 ## `sess stats`
 

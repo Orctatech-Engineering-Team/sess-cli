@@ -133,9 +133,21 @@ Implemented:
 - `sess stats`
 - `sess report`
 
+Interrupted `sess end` workflows resume from saved checkpoints. Resolve Git
+conflicts manually, then retry; saved PR inputs and completed handoff phases
+survive restarts.
+
+`sess history <session-id>` shows recorded lifecycle events and active intervals.
+Session changes and history events are saved together. Older sessions keep their
+totals without invented history. Session IDs appear in history and report lists.
+
+If a start attempt creates a branch but cannot save the session, the branch stays
+intact. Retry the same selection and choose `Track existing branch`, or run
+`sess start --adopt <branch>` without issue metadata.
+
 Not implemented yet:
 
-- resumable conflict recovery for interrupted `sess end` flows
+- automatic conflict resolution and fork-based end recovery
 - first-class auth/config commands
 - richer analytics exports and visualizations
 
@@ -161,5 +173,6 @@ sudo install -m 0755 sess /usr/local/bin/sess
 ## Releases
 
 - [Latest release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest)
+- [v0.5.0 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.5.0)
 - [v0.4.0 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.4.0)
 - [v0.3.1 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.3.1)

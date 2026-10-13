@@ -9,7 +9,29 @@ import (
 
 	"github.com/Orctatech-Engineering-Team/Sess/internal/db"
 	"github.com/Orctatech-Engineering-Team/Sess/internal/session"
+	tea "github.com/charmbracelet/bubbletea"
 )
+
+func TestStartModelQuitDoesNotReportCompletion(t *testing.T) {
+	for _, key := range []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'q'}},
+		{Type: tea.KeyCtrlC},
+	} {
+		t.Run(key.String(), func(t *testing.T) {
+			model, command := newStartModel("feature/test").Update(key)
+			started, ok := model.(startModel)
+			if !ok || started.done {
+				t.Fatalf("quit model = %#v, want incomplete start", model)
+			}
+			if command == nil {
+				t.Fatal("quit did not return a command")
+			}
+			if _, ok := command().(tea.QuitMsg); !ok {
+				t.Fatal("quit did not return tea.Quit")
+			}
+		})
+	}
+}
 
 func TestResolveStartProjectUsesDetectedBaseBranchForNewProject(t *testing.T) {
 	repoDir := newClonedGitRepo(t, "master")

@@ -20,10 +20,18 @@ This document consolidates the open GitHub issues and remaining roadmap phases s
 
 ### 1. Phase 3 — Finish Conflict Recovery (Issue #4)
 
-`sess end` is now implemented. The remaining Phase 3 gap is robust recovery from rebase, push, or PR-creation interruptions.
+`sess end` and checkpoint-based interrupted handoff recovery are implemented.
 
-**Start here:**
-- [#4 — Conflict handling](../../issues/4): detect rebase conflicts, pause workflow gracefully, allow the user to resolve and resume.
+Unfinished rebases are detected before mutation. Saved prompts, repository
+identity, and completed phases survive restarts. Matching open or merged PRs
+are reconciled before cleanup; closed-unmerged PRs leave the session open. See the
+[current milestone](IMPLEMENTATION-PLAN.md#current-milestone-interrupted-sess-end-recovery)
+for behavior and limits.
+
+Start persistence failures now return errors while preserving the created branch.
+Retrying the same interactive selection offers explicit adoption; `sess start
+--adopt <branch>` tracks an exact existing local branch without issue metadata.
+Session creation and its lifecycle event commit together.
 
 ### 2. Cross-Cutting — Output Quality (Issue #5)
 

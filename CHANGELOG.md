@@ -2,6 +2,51 @@
 
 This changelog tracks user-visible improvements to SESS.
 
+## v0.5.0 - 2026-10-13
+
+SESS now remembers progress when a handoff is interrupted. It also records when
+you start, pause, resume, and end a session, so you can see how your work unfolded.
+
+### What's new
+
+- Added saved checkpoints for `sess end`. Retrying resumes saved progress and
+  reuses a matching open or merged PR without repeating completed handoff steps.
+- Added `sess history <session-id>` with recorded lifecycle events and active
+  intervals. History lists include session IDs for opening these details.
+- Added `sess start --adopt <branch>` to track an exact existing local branch
+  without recreating it or attaching issue metadata. Interactive start also
+  offers adoption with the issue context selected during that attempt.
+
+### Reliability fixes
+
+- Failed start persistence now returns an error and preserves the created
+  branch for an explicit retry instead of reporting a successful session.
+- Session changes, history events, and project activity are saved together.
+  A failed save leaves them unchanged. Older writes cannot overwrite newer state.
+- End recovery stops on unfinished rebases, unexpected history changes,
+  changed origin destinations, or uncertain PR identity and state.
+- PR recovery checks the saved repository and branch. It does not associate your
+  session with a matching branch from someone else's fork.
+- Quitting running start or end workflows cancels their direct subprocesses
+  and waits for the workflow to stop.
+- Start checkouts and fast-forward base updates refuse to overwrite ignored
+  files. Literal branch checks handle same-named tags without confusing them
+  with the selected branch.
+
+### Notes
+
+- Existing databases are updated automatically. SESS keeps older elapsed totals
+  but does not invent missing events. Older or partial histories are labelled
+  incomplete.
+- Adoption starts tracking when the session is successfully saved. It does not
+  reconstruct time spent before a failed start.
+- End recovery currently supports a single origin destination shared by fetch
+  and push. Fork-based handoffs and separate push destinations are not supported.
+- Cancellation does not terminate hook or SSH descendant process trees; those
+  processes may require separate cleanup.
+- CI now runs integration tests on Linux, macOS, and Windows, with race checks
+  on Linux.
+
 ## v0.4.0 - 2026-04-02
 
 SESS now includes a first pass at built-in session analytics, so you can see what you worked on without opening the SQLite database by hand.
