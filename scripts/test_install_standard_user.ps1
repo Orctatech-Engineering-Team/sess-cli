@@ -17,6 +17,18 @@ $directory = Join-Path $env:ProgramData $taskName
 $password = 'Aa1!' + [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
 $created = $false
 $registered = $false
+$batchRightChanged = $false
+$originalBatchRight = ''
+
+function Set-TestBatchLogonRight {
+    param([string]$Accounts)
+    $policy = Join-Path $directory 'batch-logon.inf'
+    $content = "[Unicode]`r`nUnicode=yes`r`n[Version]`r`nsignature=`"`$CHICAGO`$`"`r`nRevision=1`r`n[Privilege Rights]`r`nSeBatchLogonRight = $Accounts`r`n"
+    [IO.File]::WriteAllText($policy, $content, [Text.Encoding]::Unicode)
+    & secedit.exe /configure /db (Join-Path $directory 'rights.sdb') /cfg $policy /areas USER_RIGHTS /quiet
+    if ($LASTEXITCODE -ne 0) { throw 'Could not configure temporary batch-logon permission.' }
+}
+
 try {
     New-LocalUser -Name $user -Password (ConvertTo-SecureString $password -AsPlainText -Force) -Description 'Temporary SESS installer test' | Out-Null
     $created = $true
@@ -32,6 +44,19 @@ try {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.ps1') -Destination $directory
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'test_install.ps1') -Destination $directory
     Copy-Item -LiteralPath $BinaryPath -Destination (Join-Path $directory 'sess.exe')
+
+    # Hosted Windows runners do not grant batch logon to ordinary Users.
+    $export = Join-Path $directory 'original-rights.inf'
+    & secedit.exe /export /cfg $export /areas USER_RIGHTS /quiet
+    if ($LASTEXITCODE -ne 0) { throw 'Could not read batch-logon policy.' }
+    foreach ($line in [IO.File]::ReadAllLines($export)) {
+        if ($line -match '^SeBatchLogonRight\s*=\s*(.*)$') { $originalBatchRight = $Matches[1] }
+    }
+    $sid = (Get-LocalUser -Name $user).SID.Value
+    $accounts = "*$sid"
+    if ($originalBatchRight) { $accounts = "$originalBatchRight,$accounts" }
+    Set-TestBatchLogonRight $accounts
+    $batchRightChanged = $true
 
     # No credentials are written to the test files or logs.
     $runner = @'
@@ -84,6 +109,7 @@ try {
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
     }
+    if ($batchRightChanged) { Set-TestBatchLogonRight $originalBatchRight }
     if ($created) { Remove-LocalUser -Name $user }
     $password = $null
     if (Test-Path -LiteralPath $directory) { Remove-Item -LiteralPath $directory -Recurse -Force }
