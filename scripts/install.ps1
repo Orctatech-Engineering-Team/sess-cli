@@ -115,6 +115,7 @@ function Install-Sess {
         $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
         if ($actual -ne $matchesForArchive[0]) { throw "Checksum mismatch for $archiveName." }
 
+        Add-Type -AssemblyName System.IO.Compression
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $zip = [IO.Compression.ZipFile]::OpenRead($archive)
         try {

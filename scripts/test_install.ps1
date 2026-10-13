@@ -49,6 +49,7 @@ function Write-TestArchive {
 
 try {
     if ($env:OS -ne 'Windows_NT') { throw 'Run Windows installer tests on Windows.' }
+    Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [IO.Directory]::CreateDirectory($root) | Out-Null
     $assets = Join-Path $root 'assets'
