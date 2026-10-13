@@ -22,17 +22,23 @@ For issue selection and PR creation, make sure `gh` is already authenticated.
 ## 1. Install SESS
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | bash
 ```
 
-On Windows, download and extract the archive instead:
+New installs go to `~/.local/bin` without sudo. Follow the installer's PATH
+instructions if needed. See [installation and updates](../../README.md#install)
+for custom directories and existing installs.
+
+On Windows, use the PowerShell installer:
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/sess-windows-amd64.zip" -OutFile "sess.zip"
-Expand-Archive sess.zip -DestinationPath .
-Move-Item .\sess.exe "$env:USERPROFILE\\bin\\sess.exe"
-# Add $env:USERPROFILE\bin to PATH if it is not already there
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.ps1" -OutFile install.ps1
+& .\install.ps1
 ```
+
+New installs use `%LOCALAPPDATA%\Programs\SESS` without administrator access.
+Follow the PATH instructions if needed. The installer does not change your
+execution policy; follow your organization's policy if script execution is blocked.
 
 Check that it is available:
 

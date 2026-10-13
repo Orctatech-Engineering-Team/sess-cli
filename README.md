@@ -18,38 +18,88 @@ SESS is designed to reduce git ceremony and preserve context across interruption
 Install the latest release:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | bash
 ```
 
-This installs `sess` to `/usr/local/bin/sess`.
-
-Install into `/usr/bin` instead:
+New installs use `~/.local/bin/sess`, without sudo. If that directory is not on
+your `PATH`, the installer shows what to add to your shell configuration:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Choose another directory:
+
+```bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | env SESS_INSTALL_DIR="$HOME/bin" bash
 ```
 
 Install a specific version:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.3.1 bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | env SESS_VERSION=v0.5.0 bash
 ```
 
 Manual install example:
 
 ```bash
 curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
-sudo install -m 0755 sess /usr/local/bin/sess
+mkdir -p "$HOME/.local/bin"
+install -m 0755 sess "$HOME/.local/bin/sess"
 ```
 
-Windows PowerShell install example:
+Windows PowerShell install:
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/sess-windows-amd64.zip" -OutFile "sess.zip"
-Expand-Archive sess.zip -DestinationPath .
-Move-Item .\sess.exe "$env:USERPROFILE\\bin\\sess.exe"
-# Add $env:USERPROFILE\bin to PATH if it is not already there
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.ps1" -OutFile install.ps1
+& .\install.ps1
 ```
+
+New Windows installs use `%LOCALAPPDATA%\Programs\SESS` without administrator
+access. The installer selects amd64 or arm64 and checks the archive checksum.
+It prints user PATH instructions without changing your settings.
+
+Choose a directory or version:
+
+```powershell
+& .\install.ps1 -InstallDir "$env:USERPROFILE\bin"
+& .\install.ps1 -Version v0.5.0
+```
+
+Windows PowerShell 5.1 and PowerShell 7 are supported. If your execution policy
+blocks the script, follow your organization's policy; the installer does not
+change it.
+
+### Update an Existing Install
+
+Rerun the installer to get the latest release. It updates the first `sess`
+executable on `PATH` in place, unless you set `SESS_INSTALL_DIR`.
+Downloads and checksums are verified before replacing the binary.
+Your sessions and history in `~/.sess-cli/sess.db` stay untouched.
+
+If your old copy is in a protected directory such as `/usr/local/bin`, the
+installer stops rather than silently creating a second copy. You can choose
+`SESS_INSTALL_DIR="$HOME/.local/bin"` and put it first on `PATH`, or update the
+system-wide copy explicitly:
+
+```bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/local/bin bash
+```
+
+For package-managed or symlinked installs, use the original package manager.
+After an update, open a new terminal or run `hash -r`, then check:
+
+```bash
+command -v sess
+sess --version
+```
+
+On Windows, download the latest installer again and rerun it. It updates the
+first `sess.exe` on PATH, or the directory you pass with `-InstallDir`.
+Close running SESS processes before updating. Protected files, symlinks, and
+junctions stop with guidance rather than creating a second copy.
+Use `Get-Command sess` and `sess --version` to check the result.
+You can also update manually by replacing the executable from the ZIP archive.
 
 ## Prerequisites
 

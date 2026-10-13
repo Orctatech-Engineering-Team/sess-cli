@@ -2,6 +2,18 @@
 
 This changelog tracks user-visible improvements to SESS.
 
+## Unreleased
+
+- New Linux and macOS installs use `~/.local/bin` without sudo. Set
+  `SESS_INSTALL_DIR` to choose another directory.
+- Rerunning the installer updates an existing writable copy on `PATH`. Protected
+  or symlinked installs stop with guidance instead of creating a second copy.
+- Updates verify downloads before replacing the binary. Session data stays
+  untouched, and the installer reports missing PATH entries or shadowed copies.
+- Added a Windows PowerShell installer with user-owned defaults, amd64/arm64
+  selection, checksum verification, and in-place updates. It preserves session
+  data and prints PATH guidance without changing user settings.
+
 ## v0.5.0 - 2026-10-13
 
 SESS now remembers progress when a handoff is interrupted. It also records when

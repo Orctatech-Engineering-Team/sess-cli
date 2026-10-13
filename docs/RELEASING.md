@@ -7,7 +7,7 @@ SESS uses GitHub Actions to automatically build and release binaries for multipl
 1. Builds binaries for 6 platforms (Linux, macOS, Windows - amd64 & arm64)
 2. Creates compressed archives (.tar.gz for Unix, .zip for Windows)
 3. Generates SHA256 checksums
-4. Publishes an `install.sh` asset for one-line installs
+4. Publishes `install.sh` and `install.ps1` assets for user-owned installs
 5. Creates a GitHub Release with all artifacts
 6. Includes installation instructions in the release notes
 
@@ -83,7 +83,8 @@ Once complete:
    - `sess-windows-arm64.zip`
 3. Verify `checksums.txt` is present
 4. Verify `install.sh` is present
-5. Check that release notes are generated
+5. Verify `install.ps1` is present
+6. Check that release notes are generated
 
 ### 6. Test the Release
 
@@ -246,29 +247,33 @@ After a release, users can install with:
 ### Linux/macOS (recommended)
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | bash
 ```
 
-This installs to `/usr/local/bin/sess` by default.
-The installer supports Linux and macOS.
+New installs use `~/.local/bin/sess` without sudo. The installer supports Linux
+and macOS, creates the directory if needed, and prints PATH instructions.
+Rerunning it updates an existing writable installation on PATH.
+See [installation and updates](../README.md#install) for protected system copies
+and migration to a user directory.
 
-To install into `/usr/bin` instead:
+To choose another directory:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_INSTALL_DIR=/usr/bin bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | env SESS_INSTALL_DIR="$HOME/bin" bash
 ```
 
 To install a specific version:
 
 ```bash
-curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | sudo env SESS_VERSION=v0.3.0 bash
+curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.sh | env SESS_VERSION=v0.5.0 bash
 ```
 
 ### Linux/macOS (manual archive install)
 
 ```bash
 curl -fsSL https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/sess-linux-amd64.tar.gz | tar xz
-sudo install -m 0755 sess /usr/local/bin/sess
+mkdir -p "$HOME/.local/bin"
+install -m 0755 sess "$HOME/.local/bin/sess"
 ```
 
 ### Homebrew (Future)
@@ -283,11 +288,17 @@ brew install sess
 ### Windows (PowerShell)
 
 ```powershell
-$version = "0.3.0"
-Invoke-WebRequest -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/download/v$version/sess-windows-amd64.zip" -OutFile "sess.zip"
-Expand-Archive sess.zip -DestinationPath $env:USERPROFILE\bin
-# Add $env:USERPROFILE\bin to PATH
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest/download/install.ps1" -OutFile install.ps1
+& .\install.ps1
 ```
+
+New installs use `%LOCALAPPDATA%\Programs\SESS`. Pass `-InstallDir` to choose
+another directory or `-Version` to select a release. The script verifies archive
+checksums and prints PATH instructions without changing user settings.
+Rerunning it updates an existing writable copy on PATH.
+
+Build and release workflows test installation and updates on Windows under
+PowerShell 7 and Windows PowerShell 5.1. Release publication waits for both.
 
 ### Windows (Scoop - Future)
 
