@@ -54,7 +54,10 @@ try {
     [IO.File]::WriteAllText($runnerPath, $runner)
     $shell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $action = New-ScheduledTaskAction -Execute $shell -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$runnerPath`""
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 5) `
+        -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+    & wevtutil.exe sl Microsoft-Windows-TaskScheduler/Operational /e:true
+    if ($LASTEXITCODE -ne 0) { throw 'Could not enable Task Scheduler diagnostics.' }
     Register-ScheduledTask -TaskName $taskName -Action $action -Settings $settings `
         -User "$env:COMPUTERNAME\$user" -Password $password -RunLevel Limited | Out-Null
     $registered = $true
@@ -68,7 +71,11 @@ try {
     if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log }
     if (-not (Test-Path -LiteralPath $result)) {
         $info = Get-ScheduledTaskInfo -TaskName $taskName
-        throw "Standard-user test timed out; task result: $($info.LastTaskResult)."
+        $task = Get-ScheduledTask -TaskName $taskName
+        Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 50 |
+            Where-Object { $_.Message -like "*$taskName*" } |
+            Select-Object TimeCreated, Id, Message | Format-List
+        throw "Standard-user test timed out; task state: $($task.State), task result: $($info.LastTaskResult)."
     }
     if ([IO.File]::ReadAllText($result) -ne 'success') { throw 'Standard-user installer tests failed.' }
     Write-Host 'Installer tests passed under a non-administrator Windows account.'
