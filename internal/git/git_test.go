@@ -53,10 +53,15 @@ func TestRebaseInProgress(t *testing.T) {
 						t.Fatal(err)
 					}
 					relative, err := filepath.Rel(cwd, nested)
-					if err != nil {
+					locations := []string{dir, nested}
+					if err == nil {
+						locations = append(locations, relative)
+					} else if filepath.VolumeName(cwd) != filepath.VolumeName(nested) {
+						t.Log("relative-path case unavailable across filesystem volumes")
+					} else {
 						t.Fatal(err)
 					}
-					for _, location := range []string{dir, nested, relative} {
+					for _, location := range locations {
 						assertRebaseInProgress(t, location, marker != "")
 					}
 				})
