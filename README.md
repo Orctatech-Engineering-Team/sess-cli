@@ -217,12 +217,14 @@ Tracked data includes projects, session state, elapsed time, linked issue metada
 git clone https://github.com/Orctatech-Engineering-Team/sess-cli.git
 cd sess-cli
 go build -o sess ./cmd/sess
-sudo install -m 0755 sess /usr/local/bin/sess
+mkdir -p "$HOME/.local/bin"
+install -m 0755 sess "$HOME/.local/bin/sess"
 ```
 
 ## Releases
 
 - [Latest release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/latest)
+- [v0.5.1 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.5.1)
 - [v0.5.0 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.5.0)
 - [v0.4.0 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.4.0)
 - [v0.3.1 release](https://github.com/Orctatech-Engineering-Team/sess-cli/releases/tag/v0.3.1)

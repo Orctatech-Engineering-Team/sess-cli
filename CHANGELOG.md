@@ -2,7 +2,10 @@
 
 This changelog tracks user-visible improvements to SESS.
 
-## Unreleased
+## v0.5.1 - 2026-10-13
+
+You can now install SESS for your own account without administrator access.
+Rerunning the installer updates your existing copy and keeps session data intact.
 
 - New Linux and macOS installs use `~/.local/bin` without sudo. Set
   `SESS_INSTALL_DIR` to choose another directory.
@@ -13,6 +16,8 @@ This changelog tracks user-visible improvements to SESS.
 - Added a Windows PowerShell installer with user-owned defaults, amd64/arm64
   selection, checksum verification, and in-place updates. It preserves session
   data and prints PATH guidance without changing user settings.
+- Windows installer tests now run under PowerShell 5.1, PowerShell 7, and a
+  standard account without administrator privileges.
 
 ## v0.5.0 - 2026-10-13
 
