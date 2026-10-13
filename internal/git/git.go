@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -195,7 +196,10 @@ func RunStream(ctx context.Context, dir string, args []string,
 
 	// Wait for process to exit
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("git failed: %w", err)
+		return fmt.Errorf("git failed: %w", errors.Join(err, ctx.Err()))
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("git interrupted: %w", err)
 	}
 	return nil
 }
