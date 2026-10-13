@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO="${SESS_REPO:-Orctatech-Engineering-Team/sess-cli}"
 BIN_NAME="sess"
-INSTALL_DIR="${SESS_INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${SESS_INSTALL_DIR:-}"
 VERSION="${SESS_VERSION:-latest}"
 BASE_URL="${SESS_BASE_URL:-}"
 SKIP_CHECKSUM="${SESS_SKIP_CHECKSUM:-0}"
@@ -53,16 +53,43 @@ checksum_cmd() {
   fail "missing checksum tool: need sha256sum or shasum"
 }
 
-ensure_install_dir() {
-  if [ -d "$INSTALL_DIR" ] && [ -w "$INSTALL_DIR" ]; then
-    return
+select_install_dir() {
+  if [ -z "$INSTALL_DIR" ]; then
+    local existing
+    existing="$(type -P "$BIN_NAME" || true)"
+    if [ -n "$existing" ]; then
+      INSTALL_DIR="$(dirname "$existing")"
+      log "Found existing installation: $existing"
+    else
+      [ -n "${HOME:-}" ] || fail "HOME is not set; set SESS_INSTALL_DIR"
+      INSTALL_DIR="$HOME/.local/bin"
+    fi
   fi
-
-  if [ "$(id -u)" -ne 0 ]; then
-    fail "install directory $INSTALL_DIR is not writable; rerun with sudo or set SESS_INSTALL_DIR"
+  mkdir -p "$INSTALL_DIR" || fail "cannot create $INSTALL_DIR; choose a writable SESS_INSTALL_DIR"
+  INSTALL_DIR="$(cd "$INSTALL_DIR" && pwd -P)"
+  [ -w "$INSTALL_DIR" ] || fail "install directory $INSTALL_DIR is not writable; set SESS_INSTALL_DIR=\"\$HOME/.local/bin\" to install for yourself, or explicitly update this directory with administrator permissions"
+  if [ -L "$INSTALL_DIR/$BIN_NAME" ]; then
+    fail "$INSTALL_DIR/$BIN_NAME is a symlink; update it through its package manager or choose another SESS_INSTALL_DIR"
   fi
+  if [ -e "$INSTALL_DIR/$BIN_NAME" ] && [ ! -f "$INSTALL_DIR/$BIN_NAME" ]; then
+    fail "$INSTALL_DIR/$BIN_NAME is not a regular file"
+  fi
+}
 
-  mkdir -p "$INSTALL_DIR"
+report_path() {
+  local active
+  active="$(type -P "$BIN_NAME" || true)"
+  if [ -z "$active" ]; then
+    log "Add this directory to PATH in your shell configuration:"
+    printf '  export PATH=%q:"$PATH"\n' "$INSTALL_DIR"
+  elif [ "$active" -ef "$INSTALL_DIR/$BIN_NAME" ]; then
+    log "Run 'hash -r' or open a new terminal, then 'sess --version'."
+  else
+    log "PATH still selects another installation: $active"
+    log "Put $INSTALL_DIR first on PATH to use this copy:"
+    printf '  export PATH=%q:"$PATH"\n' "$INSTALL_DIR"
+    log "Run 'hash -r' or open a new terminal, then 'command -v sess' and 'sess --version'."
+  fi
 }
 
 resolve_base_url() {
@@ -82,15 +109,19 @@ resolve_base_url() {
 main() {
   need_cmd curl
   need_cmd tar
+  need_cmd install
+  need_cmd mv
 
-  local os arch archive_name download_base tmpdir archive_path checksums_path expected_sum actual_sum checksum_tool
+  local os arch archive_name download_base archive_path checksums_path expected_sum actual_sum checksum_tool
+  select_install_dir
   os="$(detect_os)"
   arch="$(detect_arch)"
   archive_name="${BIN_NAME}-${os}-${arch}.tar.gz"
   download_base="$(resolve_base_url)"
 
   tmpdir="$(mktemp -d)"
-  trap "rm -rf '$tmpdir'" EXIT
+  staged=""
+  trap 'rm -rf -- "$tmpdir"; if [ -n "$staged" ]; then rm -f -- "$staged"; fi' EXIT
 
   archive_path="$tmpdir/$archive_name"
   checksums_path="$tmpdir/checksums.txt"
@@ -112,15 +143,17 @@ main() {
 
   log "Extracting archive..."
   tar -xzf "$archive_path" -C "$tmpdir"
-  [ -f "$tmpdir/$BIN_NAME" ] || fail "archive did not contain $BIN_NAME"
-
-  ensure_install_dir
+  [ -f "$tmpdir/$BIN_NAME" ] && [ ! -L "$tmpdir/$BIN_NAME" ] || fail "archive did not contain a regular $BIN_NAME binary"
 
   log "Installing to $INSTALL_DIR/$BIN_NAME..."
-  install -m 0755 "$tmpdir/$BIN_NAME" "$INSTALL_DIR/$BIN_NAME"
+  staged="$(mktemp "$INSTALL_DIR/.sess-install.XXXXXX")"
+  install -m 0755 "$tmpdir/$BIN_NAME" "$staged"
+  mv -f "$staged" "$INSTALL_DIR/$BIN_NAME"
+  staged=""
 
   log "Installed $BIN_NAME to $INSTALL_DIR/$BIN_NAME"
   "$INSTALL_DIR/$BIN_NAME" --version || true
+  report_path
 }
 
 main "$@"

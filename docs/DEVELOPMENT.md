@@ -86,6 +86,27 @@ go test -race -tags=integration ./...
 POSIX hook and fake-`gh` fixtures are skipped on Windows. CI runs the tagged
 suite on all supported runner platforms and race checks on Linux.
 
+Installer tests use isolated homes and local release archives. On Linux or macOS:
+
+```bash
+bash -n scripts/install.sh
+python3 scripts/test_install.py
+```
+
+These checks cover new installs, upgrades, PATH conflicts, permissions, and
+failed checksums without touching your installed binary or session database.
+
+On Windows, test with a built binary in both PowerShell versions:
+
+```powershell
+go build -o sess.exe ./cmd/sess
+powershell -NoProfile -File scripts/test_install.ps1 -BinaryPath ./sess.exe
+pwsh -NoProfile -File scripts/test_install.ps1 -BinaryPath ./sess.exe
+```
+
+The Windows fixtures use temporary archives and directories. They cover updates,
+locked and read-only files, junctions, checksums, and archive layout.
+
 When changing lifecycle behavior, add coverage for:
 
 - session state transitions

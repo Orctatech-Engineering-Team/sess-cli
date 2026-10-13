@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, dev, 'test/installer-*' ]
   pull_request:
     branches: [ main, dev ]
 
@@ -36,6 +36,27 @@ jobs:
 
       - name: Run tests
         run: go test -v -tags=integration ./...
+
+      - name: Test installer
+        if: runner.os != 'Windows'
+        run: |
+          bash -n scripts/install.sh
+          python3 scripts/test_install.py
+
+      - name: Test Windows installer (PowerShell 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/test_install.ps1 -BinaryPath ./sess.exe
+
+      - name: Test Windows installer (Windows PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/test_install.ps1 -BinaryPath ./sess.exe
+
+      - name: Test Windows installer as a standard user
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/test_install_standard_user.ps1 -BinaryPath ./sess.exe
 
       - name: Run race checks
         if: matrix.os == 'ubuntu-latest'
