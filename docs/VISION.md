@@ -14,6 +14,24 @@ SESS fills this gap. It ties your work to explicit sessions with branches, issue
 
 The CLI and local session history work today. The dashboard, team sharing, and nudges described below are planned.
 
+## Shared Work Between Humans and Agents
+
+**SESS becomes the durable work-session layer shared by humans and coding agents.**
+
+Humans and agents should be able to join the same session without depending on
+one chat transcript or model provider. SESS preserves the objective, repository
+state, validation evidence, completed work, known risks, and next action between
+participants.
+
+This does not turn SESS into an agent orchestrator or a reasoning recorder.
+Humans remain in control of scope, review, and release decisions. SESS stores
+durable work facts so the next participant can continue safely.
+
+The first step is to design a small
+[Agent Work Protocol](explanation/agent-work-protocol.md) around context,
+attempts, checks, and handoffs. Commands and persistence follow only after that
+contract is clear.
+
 ## Core Principles
 
 **Intentionality over autopilot.** Every session is a conscious choice. SESS does not silently track your work in the background. You start a session when you begin focused work, you pause when you step away, and you end when the work ships. This is not a time tracker that runs all day. It is a tool that respects the difference between being at your desk and actually doing focused work.

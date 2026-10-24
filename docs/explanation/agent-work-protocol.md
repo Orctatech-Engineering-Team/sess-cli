@@ -4,6 +4,11 @@ SESS can give humans and coding agents a shared, durable structure for software
 work. The goal is not to record an agent's private reasoning. It is to preserve
 the facts another human or agent needs to continue safely.
 
+The north star is:
+
+> **SESS becomes the durable work-session layer shared by humans and coding
+> agents.**
+
 ## The problem
 
 Coding agents often start from a prompt and repository checkout, then lose useful
@@ -38,6 +43,101 @@ including implementation, review, and release work by different participants.
 ```text
 issue → session → attempt → changes and checks → handoff
 ```
+
+## Protocol v0 design
+
+Design the protocol before adding commands or database tables. Protocol v0 has
+four records: context, attempt, check, and handoff. The design must define their
+meaning, relationships, required fields, lifecycle, and privacy rules.
+
+### Context
+
+Context is a read-only snapshot of the work a participant is about to join. It
+answers:
+
+- Which session and project is this?
+- What is the objective and linked issue?
+- Which branch, base branch, and repository revision are current?
+- What state is the session in?
+- What was the latest handoff?
+- Which checks are required or already known?
+- Is any information missing, legacy, or uncertain?
+
+Context is derived from durable records. It is not an editable note and does not
+claim that repository state stayed unchanged after the snapshot.
+
+### Attempt
+
+An attempt is one participant's bounded contribution to a session. It records:
+
+- a stable attempt ID and parent session ID
+- participant kind and optional participant name
+- role, such as implementation, review, or release
+- start and finish times
+- starting and resulting repository revisions
+- state: active, blocked, completed, cancelled, or failed
+- optional advisory scope claims
+
+An attempt belongs to exactly one session. Finishing an attempt does not end the
+session. A cancelled or failed attempt remains part of the record.
+
+### Check
+
+A check is validation evidence produced during an attempt. It records:
+
+- check ID and parent attempt ID
+- command or named procedure
+- start and finish times
+- outcome: passed, failed, cancelled, or unavailable
+- repository revision tested
+- a bounded, redacted summary or reference to retained output
+
+A passing check applies only to the recorded revision and environment. It is not
+an approval and does not prove that untested behavior works.
+
+### Handoff
+
+A handoff is a participant's durable summary for whoever continues the session.
+It records:
+
+- handoff ID, session ID, and source attempt ID
+- completed work
+- remaining work
+- blockers and known risks
+- next useful action
+- repository revision at handoff
+- checks that support the handoff
+
+A session may have several handoffs. New context uses the latest valid handoff
+but retains older handoffs as history. A handoff does not silently change
+session state or approve a release.
+
+### Protocol invariants
+
+Protocol v0 should preserve these rules:
+
+1. Every attempt belongs to one session.
+2. Every check belongs to one attempt and one repository revision.
+3. Every handoff identifies its source attempt and repository revision.
+4. Context states when source data is missing, stale, or uncertain.
+5. Records are append-oriented; corrections do not rewrite historical evidence.
+6. Implementation and independent review are different attempt roles.
+7. No record contains hidden reasoning, secrets, or complete tool transcripts by
+   default.
+8. Creating protocol records does not perform Git or GitHub side effects.
+
+### Design deliverables
+
+Before implementation, the protocol design should produce:
+
+- a versioned JSON representation for each record
+- example records for human-only, agent-only, and mixed sessions
+- state-transition rules for attempts
+- redaction, output-size, and retention rules for checks
+- rules for selecting the latest valid handoff
+- compatibility behavior for existing sessions
+- a threat and privacy review
+- an implementation sequence made of thin, testable slices
 
 ## What this structure provides
 
@@ -96,10 +196,10 @@ Implementation and review should be separate roles. An implementing attempt may
 record its checks, but it cannot turn its own claim into independent review
 approval.
 
-## Minimal first slice
+## Implementation after protocol approval
 
-Do not begin with a general agent orchestration system. Start with a read-only
-context command:
+Do not begin implementation with a general agent orchestration system. After
+Protocol v0 is reviewed and accepted, start with a read-only context command:
 
 ```bash
 sess context --json
@@ -114,8 +214,9 @@ The first version should:
 - explain missing or legacy data explicitly
 - work for humans, scripts, and any agent vendor
 
-After the context contract is proven, add attempts, checks, and handoffs as thin
-end-to-end slices.
+After the context contract is proven in use, add attempts, checks, and handoffs
+as thin end-to-end slices. Each slice should implement the approved protocol
+rather than inventing its contract inside command code.
 
 ## What SESS should not store
 
