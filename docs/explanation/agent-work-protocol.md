@@ -31,6 +31,8 @@ participate through attempts:
 
 - **Session**: the issue, branch, objective, and lifecycle of the work
 - **Attempt**: one bounded period in which a human or agent works on the session
+- **Participant identity**: stable self-asserted attribution across attempts,
+  similar to Git author identity but not proof of identity
 - **Claim**: an advisory scope an attempt intends to change
 - **Check**: recorded validation evidence, including the command and result
 - **Handoff**: completed work, remaining work, risks, and the next useful action
@@ -253,7 +255,7 @@ This direction should preserve existing SESS principles:
 Before attempts become persistent, decide:
 
 1. Is an attempt always nested inside one session?
-2. How is a participant identified without requiring accounts?
+2. How could a self-asserted participant ID gain optional verification later?
 3. Which claims may overlap, and how are stale claims cleared?
 4. Which check outputs are retained, and what information must be redacted?
 5. How does review approval prove independence from implementation?

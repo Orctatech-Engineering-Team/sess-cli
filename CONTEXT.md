@@ -43,6 +43,11 @@ _Avoid_: Prompt, editable note
 One bounded human, agent, or automated contribution to a session.
 _Avoid_: Session, command invocation
 
+**Participant identity**:
+Stable, self-asserted attribution for a human, agent, or automation profile
+across attempts. It does not prove identity.
+_Avoid_: Account, authenticated identity
+
 **Claim**:
 An advisory description of the scope an attempt intends to change. It warns
 about overlap but does not lock work.

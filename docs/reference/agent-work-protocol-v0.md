@@ -146,8 +146,10 @@ An attempt is one participant's bounded contribution to one session.
     "id": "attempt:01",
     "session_id": "session:42",
     "participant": {
+      "id": "participant:7c553bb2-8b35-4fb9-b8cb-209a9d1f8ae1",
       "kind": "agent",
-      "label": "reviewer"
+      "label": "reviewer",
+      "identity_source": "configured"
     },
     "role": "review",
     "state": "active",
@@ -173,9 +175,34 @@ An attempt is one participant's bounded contribution to one session.
 }
 ```
 
-Participant `kind` is `human`, `agent`, or `automation`. `label` is optional,
-user-supplied display text. Protocol v0 stores no provider account, prompt,
-conversation ID, or model identifier by default.
+### Participant identity
+
+A participant ID provides stable attribution across attempts. It is analogous
+to Git author identity: useful attribution, but not authentication.
+
+Participant fields are:
+
+- `id`: a stable opaque ID, unique within SESS records
+- `kind`: `human`, `agent`, or `automation`
+- `label`: optional user-supplied display text
+- `identity_source`: `configured`, `orchestrator`, or `ephemeral`
+
+A configured human or agent profile reuses its participant ID across attempts.
+An agent orchestrator may supply a stable ID for a named agent profile. When no
+stable identity is available, SESS may create an ephemeral participant ID that
+is valid for one attempt and records `identity_source: ephemeral`.
+
+Attempt IDs still identify individual runs. A participant may therefore own
+many attempts, while every attempt has its own ID.
+
+Protocol v0 does not require an email address and does not derive identity from
+Git configuration. It stores no provider account, prompt, conversation ID, or
+model identifier by default. Future designs may associate external identities
+or signatures with a participant ID without changing historical attempt IDs.
+
+Participant IDs are self-asserted. They do not prove that a human, model, or
+orchestrator is who it claims to be. Interfaces must not display them as verified
+identity.
 
 Attempt `role` is `implementation`, `review`, `research`, `release`, or `other`.
 Role describes the attempt's purpose; it grants no permission.
@@ -397,16 +424,20 @@ The record distinguishes implementation evidence from independent review.
 
 ## Decisions requiring approval
 
-Protocol v0 recommends these choices:
+The maintainer approved these choices on 2026-10-18:
 
 1. Context is derived and read-only, not a persisted record.
 2. Attempts always belong to exactly one session.
-3. Participant identity is an unauthenticated kind and optional label.
+3. Participant identity is stable attribution, not authentication. It uses an
+   opaque participant ID, kind, optional label, and identity source.
 4. Concurrent attempts and overlapping claims are allowed with warnings.
 5. Checks store structured outcomes and a short redacted summary, not raw output.
 6. Checks against dirty worktrees are explicitly non-reproducible.
+
+These choices still require approval:
+
 7. Handoffs are append-only and corrected through `supersedes_id`.
 8. Protocol records have no automatic deletion in v0.
 
-These choices require maintainer approval before implementation issues are
-created.
+Implementation issues remain blocked until the pending choices and the complete
+Protocol v0 draft are approved.
