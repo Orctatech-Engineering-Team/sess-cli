@@ -21,6 +21,7 @@ If you need exact command or data-model details:
 If you want to understand the workflow and mental model:
 
 - [Explanation: How SESS works](explanation/how-sess-works.md)
+- [Explanation: Structure AI agent work with SESS](explanation/agent-work-protocol.md)
 
 ## Vision and Strategy
 
