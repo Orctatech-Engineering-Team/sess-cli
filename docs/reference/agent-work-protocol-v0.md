@@ -1,6 +1,6 @@
 # Agent Work Protocol v0
 
-**Status:** Draft for review  
+**Status:** Approved for implementation planning
 **Issue:** [#10](https://github.com/Orctatech-Engineering-Team/sess-cli/issues/10)
 
 This document defines a small, local-first protocol for humans and coding agents
@@ -348,11 +348,26 @@ silently discarded.
 ## Retention and deletion
 
 Protocol records remain local in the SESS database and follow their session's
-retention. Protocol v0 adds no automatic deletion or remote synchronization.
+retention. Protocol v0 keeps records indefinitely and adds no automatic
+compaction, deletion, or remote synchronization.
 
 Deleting a project or session is a separate product decision and must state what
 happens to protocol records before implementation. Until then, no new command
 may delete attempts, checks, or handoffs.
+
+A later record-lifecycle design should cover:
+
+- backup and restore before destructive operations
+- export in a stable, versioned format
+- explicit deletion with a preview of affected records
+- compaction that preserves the meaning and source of retained evidence
+- retention policies for large check and handoff histories
+- transactional failure and recovery behavior
+
+Compaction must not silently turn several attempts into one, discard failed
+checks that explain later work, or replace an original handoff with its
+correction. A compact representation must remain distinguishable from the
+original record history.
 
 ## Threat and privacy review
 
@@ -422,7 +437,7 @@ The replacement does not need the first agent's full transcript.
 
 The record distinguishes implementation evidence from independent review.
 
-## Decisions requiring approval
+## Approved decisions
 
 The maintainer approved these choices on 2026-10-18:
 
@@ -433,11 +448,10 @@ The maintainer approved these choices on 2026-10-18:
 4. Concurrent attempts and overlapping claims are allowed with warnings.
 5. Checks store structured outcomes and a short redacted summary, not raw output.
 6. Checks against dirty worktrees are explicitly non-reproducible.
+7. Handoffs are append-only and corrected through `supersedes_id`, preserving
+   the original handoff.
+8. Protocol v0 keeps records indefinitely. Backup, export, explicit deletion,
+   and compaction require a separate design before implementation.
 
-These choices still require approval:
-
-7. Handoffs are append-only and corrected through `supersedes_id`.
-8. Protocol records have no automatic deletion in v0.
-
-Implementation issues remain blocked until the pending choices and the complete
-Protocol v0 draft are approved.
+Protocol v0 is approved for implementation planning. Each command and persistence
+change must still be proposed as a thin, independently reviewable slice.

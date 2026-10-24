@@ -250,20 +250,18 @@ This direction should preserve existing SESS principles:
 - **Evidence, not surveillance**: analytics describe attempts and outcomes, not
   developer or agent productivity
 
-## Open questions
+## Future design questions
 
-Before attempts become persistent, decide:
+Protocol v0 resolves record ownership, attribution, claims, check evidence,
+handoff correction, and initial retention. Later versions still need to decide:
 
-1. Is an attempt always nested inside one session?
-2. How could a self-asserted participant ID gain optional verification later?
-3. Which claims may overlap, and how are stale claims cleared?
-4. Which check outputs are retained, and what information must be redacted?
-5. How does review approval prove independence from implementation?
-6. Which records may eventually be shared through Git?
-7. What is the retention policy for agent-generated work records?
+1. How could a self-asserted participant ID gain optional verification?
+2. Which records may eventually be shared through Git?
+3. How should backup, export, explicit deletion, and compaction work?
+4. What additional evidence is required for independent review approval?
 
 The answers should be tested against concrete human-only, agent-only, and mixed
-handoff scenarios before expanding the database model.
+handoff scenarios before those capabilities expand the protocol.
 
 The concrete record contracts, state transitions, limits, and scenarios are in
 the [Agent Work Protocol v0 reference draft](../reference/agent-work-protocol-v0.md).
