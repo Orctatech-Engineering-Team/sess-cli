@@ -17,6 +17,7 @@ If you need exact command or data-model details:
 
 - [Reference: Commands](reference/commands.md)
 - [Reference: Session model](reference/session-model.md)
+- [Reference: Agent Work Protocol v0 draft](reference/agent-work-protocol-v0.md)
 
 If you want to understand the workflow and mental model:
 

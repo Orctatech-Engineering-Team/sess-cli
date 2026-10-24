@@ -120,7 +120,8 @@ Protocol v0 should preserve these rules:
 2. Every check belongs to one attempt and one repository revision.
 3. Every handoff identifies its source attempt and repository revision.
 4. Context states when source data is missing, stale, or uncertain.
-5. Records are append-oriented; corrections do not rewrite historical evidence.
+5. Checks are immutable and handoff corrections append new records; attempt
+   lifecycle updates cannot rewrite their evidence.
 6. Implementation and independent review are different attempt roles.
 7. No record contains hidden reasoning, secrets, or complete tool transcripts by
    default.
@@ -261,3 +262,6 @@ Before attempts become persistent, decide:
 
 The answers should be tested against concrete human-only, agent-only, and mixed
 handoff scenarios before expanding the database model.
+
+The concrete record contracts, state transitions, limits, and scenarios are in
+the [Agent Work Protocol v0 reference draft](../reference/agent-work-protocol-v0.md).

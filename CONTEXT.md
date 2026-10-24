@@ -33,3 +33,27 @@ _Avoid_: Focus time, productive time
 Saved progress through a session's Git and pull-request handoff, retained until
 session completion succeeds.
 _Avoid_: Lifecycle event, ended session
+
+**Work context**:
+A read-only snapshot of the current session and the durable facts a participant
+needs before joining the work.
+_Avoid_: Prompt, editable note
+
+**Attempt**:
+One bounded human, agent, or automated contribution to a session.
+_Avoid_: Session, command invocation
+
+**Claim**:
+An advisory description of the scope an attempt intends to change. It warns
+about overlap but does not lock work.
+_Avoid_: Lock, assignment
+
+**Check**:
+Validation evidence produced by an attempt and tied to the repository state it
+examined.
+_Avoid_: Approval, guarantee
+
+**Handoff**:
+A durable summary of completed work, remaining work, risks, and the next useful
+action from one attempt to a later participant.
+_Avoid_: Transcript, end checkpoint
