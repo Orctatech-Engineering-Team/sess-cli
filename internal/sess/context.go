@@ -36,7 +36,7 @@ type contextData struct {
 	Project         *contextProject         `json:"project"`
 	Session         *contextSession         `json:"session"`
 	RepositoryState *contextRepositoryState `json:"repository_state"`
-	ActiveAttempts  []any                   `json:"active_attempts"`
+	ActiveAttempts  []*contextAttempt       `json:"active_attempts"`
 	LatestHandoff   any                     `json:"latest_handoff"`
 	Checks          []any                   `json:"checks"`
 	Warnings        []contextWarning        `json:"warnings"`
@@ -59,6 +59,34 @@ type contextSession struct {
 type contextIssue struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
+}
+
+type contextAttempt struct {
+	ID                    string                  `json:"id"`
+	SessionID             string                  `json:"session_id"`
+	Participant           contextParticipant      `json:"participant"`
+	Role                  string                  `json:"role"`
+	State                 string                  `json:"state"`
+	StartedAt             string                  `json:"started_at"`
+	UpdatedAt             string                  `json:"updated_at"`
+	FinishedAt            *string                 `json:"finished_at"`
+	StartRepositoryState  contextRepositoryState  `json:"start_repository_state"`
+	ResultRepositoryState *contextRepositoryState `json:"result_repository_state"`
+	Claims                []contextClaim          `json:"claims"`
+	BlockedReason         string                  `json:"blocked_reason"`
+}
+
+type contextParticipant struct {
+	ID             string `json:"id"`
+	Kind           string `json:"kind"`
+	Label          string `json:"label"`
+	IdentitySource string `json:"identity_source"`
+}
+
+type contextClaim struct {
+	Type      string `json:"type"`
+	Value     string `json:"value"`
+	CreatedAt string `json:"created_at"`
 }
 
 type contextRepositoryState struct {
@@ -110,7 +138,7 @@ func writeContext(ctx stdcontext.Context, w io.Writer, cwd, dbPath string, now t
 	generatedAt := now.Format(time.RFC3339Nano)
 	data := contextData{
 		Availability:   "no_repository",
-		ActiveAttempts: make([]any, 0),
+		ActiveAttempts: make([]*contextAttempt, 0),
 		Checks:         make([]any, 0),
 		Warnings:       make([]contextWarning, 0),
 	}
@@ -130,7 +158,7 @@ func writeContext(ctx stdcontext.Context, w io.Writer, cwd, dbPath string, now t
 			if !os.IsNotExist(err) {
 				return fmt.Errorf("inspect database: %w", err)
 			}
-		} else if err := readContextSession(cwd, dbPath, &data); err != nil {
+		} else if err := readContextSession(cwd, dbPath, generatedAt, &data); err != nil {
 			return err
 		}
 	}
@@ -150,7 +178,7 @@ func writeContext(ctx stdcontext.Context, w io.Writer, cwd, dbPath string, now t
 	return nil
 }
 
-func readContextSession(cwd, dbPath string, data *contextData) (err error) {
+func readContextSession(cwd, dbPath, generatedAt string, data *contextData) (err error) {
 	database, err := db.OpenReadOnly(dbPath)
 	if err != nil {
 		return err
@@ -194,8 +222,113 @@ func readContextSession(cwd, dbPath string, data *contextData) (err error) {
 				Message: "The checked-out branch does not match the session branch.",
 			})
 		}
+		attempts, err := database.ListActiveAttempts(current.ID)
+		if err != nil {
+			return fmt.Errorf("list active attempts: %w", err)
+		}
+		data.ActiveAttempts = make([]*contextAttempt, 0, len(attempts))
+		now, _ := time.Parse(time.RFC3339Nano, generatedAt)
+		for _, attempt := range attempts {
+			data.ActiveAttempts = append(data.ActiveAttempts, contextAttemptFromDB(attempt))
+			if attempt.State == db.AttemptActive && now.Sub(attempt.UpdatedAt) >= 24*time.Hour {
+				data.Warnings = append(data.Warnings, contextWarning{
+					Code:    "attempt_claim_stale",
+					Message: fmt.Sprintf("Attempt %s has not been updated for at least 24 hours.", attempt.ID),
+				})
+			}
+			for _, claim := range attempt.Claims {
+				for _, other := range attempts {
+					if other.ID <= attempt.ID {
+						continue
+					}
+					for _, otherClaim := range other.Claims {
+						if contextClaimsOverlap(claim.Type, claim.Value, otherClaim.Type, otherClaim.Value) {
+							data.Warnings = append(data.Warnings, contextWarning{
+								Code:    "attempt_claim_overlap",
+								Message: fmt.Sprintf("Attempt %s overlaps %s on %s %q.", attempt.ID, other.ID, claim.Type, claim.Value),
+							})
+						}
+					}
+				}
+			}
+		}
 	}
 	return nil
+}
+
+func contextAttemptFromDB(attempt *db.Attempt) *contextAttempt {
+	claims := make([]contextClaim, 0, len(attempt.Claims))
+	for _, claim := range attempt.Claims {
+		claims = append(claims, contextClaim{
+			Type: claim.Type, Value: claim.Value,
+			CreatedAt: claim.CreatedAt.UTC().Format(time.RFC3339Nano),
+		})
+	}
+	return &contextAttempt{
+		ID:                    contextRecordIDString("attempt", attempt.ID),
+		SessionID:             contextRecordID("session", attempt.SessionID),
+		Participant:           contextParticipant{ID: attempt.Participant.ID, Kind: attempt.Participant.Kind, Label: attempt.Participant.Label, IdentitySource: attempt.Participant.IdentitySource},
+		Role:                  attempt.Role,
+		State:                 attempt.State,
+		StartedAt:             attempt.StartedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt:             attempt.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		FinishedAt:            contextTimePointer(attempt.FinishedAt),
+		StartRepositoryState:  *contextRepositoryStateFromDB(&attempt.StartRepositoryState),
+		ResultRepositoryState: contextRepositoryStateFromDB(attempt.ResultRepositoryState),
+		Claims:                claims,
+		BlockedReason:         attempt.BlockedReason,
+	}
+}
+
+func contextRepositoryStateFromDB(state *db.RepositoryState) *contextRepositoryState {
+	if state == nil {
+		return nil
+	}
+	return &contextRepositoryState{
+		Repository: optionalString(state.Repository),
+		Branch:     optionalString(state.Branch),
+		HeadOID:    optionalString(state.HeadOID),
+		Worktree:   state.Worktree,
+		CapturedAt: state.CapturedAt.UTC().Format(time.RFC3339Nano),
+	}
+}
+
+func contextTimePointer(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	formatted := value.UTC().Format(time.RFC3339Nano)
+	return &formatted
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func contextRecordIDString(kind, id string) string {
+	return kind + ":" + id
+}
+
+func contextClaimsOverlap(leftType, leftValue, rightType, rightValue string) bool {
+	if leftType != rightType {
+		return false
+	}
+	if leftValue == rightValue {
+		return true
+	}
+	if leftType != "path" {
+		return false
+	}
+	return contextPathClaimContains(leftValue, rightValue) ||
+		contextPathClaimContains(rightValue, leftValue)
+}
+
+func contextPathClaimContains(pattern, value string) bool {
+	return strings.HasSuffix(pattern, "/**") &&
+		strings.HasPrefix(value, strings.TrimSuffix(pattern, "**"))
 }
 
 func readContextRepositoryState(

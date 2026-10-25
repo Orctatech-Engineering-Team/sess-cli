@@ -10,8 +10,10 @@ implementation slice must follow; it does not authorize agent automation.
 ## Implementation status
 
 The first slice, `sess context --json`, implements the read-only context
-envelope using existing project, session, and Git state. Attempts, checks, and
-handoffs are still protocol contracts only and return empty or `null` values.
+envelope using existing project, session, and Git state. The second slice,
+`sess attempt`, implements participant identities, attempts, and advisory claims.
+Checks and handoffs remain protocol contracts only and return empty or `null`
+values.
 
 ## Design goals
 

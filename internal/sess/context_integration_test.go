@@ -148,6 +148,25 @@ func TestContextCommandSessionContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	participant := db.Participant{
+		ID: "participant:context", Kind: db.ParticipantAgent,
+		Label: "context-agent", IdentitySource: "configured",
+		CreatedAt: time.Date(2026, 10, 18, 10, 31, 0, 0, time.UTC),
+	}
+	if err := database.CreateParticipant(&participant); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.CreateAttempt(&db.Attempt{
+		ID: "attempt:context", SessionID: started.ID, Participant: participant,
+		Role: "implementation", State: db.AttemptActive,
+		StartedAt: participant.CreatedAt, UpdatedAt: participant.CreatedAt,
+		StartRepositoryState: db.RepositoryState{
+			Branch: "feature/context", Worktree: "clean", CapturedAt: participant.CreatedAt,
+		},
+		Claims: []db.AttemptClaim{{Type: "path", Value: "internal/sess/**", CreatedAt: participant.CreatedAt}},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	closeContextTestDB(t, database)
 	indexPath := filepath.Join(cwd, ".git", "index")
 	indexBefore, err := os.ReadFile(indexPath)
@@ -192,7 +211,10 @@ func TestContextCommandSessionContract(t *testing.T) {
 		envelope.Data.RepositoryState.Worktree != "clean" {
 		t.Fatalf("repository state = %#v", envelope.Data.RepositoryState)
 	}
-	if envelope.Data.ActiveAttempts == nil || len(envelope.Data.ActiveAttempts) != 0 ||
+	if len(envelope.Data.ActiveAttempts) != 1 ||
+		envelope.Data.ActiveAttempts[0].ID != "attempt:attempt:context" ||
+		envelope.Data.ActiveAttempts[0].Participant.ID != participant.ID ||
+		len(envelope.Data.ActiveAttempts[0].Claims) != 1 ||
 		envelope.Data.Checks == nil || len(envelope.Data.Checks) != 0 ||
 		envelope.Data.LatestHandoff != nil {
 		t.Fatalf("protocol history = attempts %#v, checks %#v, handoff %#v",

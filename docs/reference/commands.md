@@ -112,6 +112,40 @@ snapshot was taken. IDs are opaque protocol strings such as `project:7` and
 See [Agent Work Protocol v0](agent-work-protocol-v0.md) for the full JSON
 contract and compatibility rules.
 
+## `sess attempt`
+
+Manages a bounded human, agent, or automation contribution to the current
+session.
+
+### Usage
+
+```bash
+sess attempt start --kind agent --label reviewer --role review \
+  --participant-id participant:reviewer \
+  --claim path=internal/db/**
+sess attempt block <attempt-id> --reason "waiting for review"
+sess attempt resume <attempt-id>
+sess attempt finish <attempt-id> --state completed
+```
+
+### Behavior
+
+- requires an active or paused session in the current tracked project
+- creates a stable participant identity when `--participant-id` is supplied
+- creates an ephemeral participant identity when no ID is supplied
+- accepts `human`, `agent`, or `automation` participant kinds
+- accepts `configured`, `orchestrator`, or `ephemeral` identity sources
+- accepts `implementation`, `review`, `research`, `release`, or `other` roles
+- stores advisory claims and warns when they overlap an active attempt
+- allows concurrent attempts without locking files or assigning work
+- permits only `active -> blocked|completed|cancelled|failed` and
+  `blocked -> active|completed|cancelled|failed`
+- records repository state at attempt start and terminal finish
+- keeps terminal attempts immutable and prevents reopening them
+
+Participant IDs provide self-asserted attribution. They do not authenticate a
+human, agent, or automation profile. Attempts appear in `sess context --json`.
+
 ## `sess resume`
 
 Resumes a paused session.

@@ -154,6 +154,54 @@ func (db *DB) init() error {
 	CREATE INDEX IF NOT EXISTS idx_sessions_state ON sessions(state);
 	CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time);
 
+	CREATE TABLE IF NOT EXISTS participants (
+		id TEXT PRIMARY KEY,
+		kind TEXT NOT NULL CHECK(kind IN ('human', 'agent', 'automation')),
+		label TEXT NOT NULL DEFAULT '',
+		identity_source TEXT NOT NULL CHECK(identity_source IN ('configured', 'orchestrator', 'ephemeral')),
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS attempts (
+		id TEXT PRIMARY KEY,
+		session_id INTEGER NOT NULL,
+		participant_id TEXT NOT NULL,
+		role TEXT NOT NULL CHECK(role IN ('implementation', 'review', 'research', 'release', 'other')),
+		state TEXT NOT NULL CHECK(state IN ('active', 'blocked', 'completed', 'cancelled', 'failed')),
+		started_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		finished_at DATETIME,
+		start_repository TEXT,
+		start_branch TEXT,
+		start_head_oid TEXT,
+		start_worktree TEXT NOT NULL,
+		start_captured_at DATETIME NOT NULL,
+		result_repository TEXT,
+		result_branch TEXT,
+		result_head_oid TEXT,
+		result_worktree TEXT,
+		result_captured_at DATETIME,
+		blocked_reason TEXT NOT NULL DEFAULT '',
+		FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+		FOREIGN KEY (participant_id) REFERENCES participants(id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_attempts_session_state ON attempts(session_id, state);
+	CREATE INDEX IF NOT EXISTS idx_attempts_participant_id ON attempts(participant_id);
+
+	CREATE TABLE IF NOT EXISTS attempt_claims (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		attempt_id TEXT NOT NULL,
+		type TEXT NOT NULL CHECK(type IN ('path', 'workflow', 'other')),
+		value TEXT NOT NULL,
+		created_at DATETIME NOT NULL,
+		UNIQUE(attempt_id, type, value),
+		FOREIGN KEY (attempt_id) REFERENCES attempts(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_attempt_claims_attempt_id ON attempt_claims(attempt_id);
+
 	CREATE TABLE IF NOT EXISTS session_events (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		session_id INTEGER NOT NULL,

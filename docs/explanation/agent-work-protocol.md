@@ -217,9 +217,10 @@ The first version should:
 - explain missing or legacy data explicitly
 - work for humans, scripts, and any agent vendor
 
-After the context contract is proven in use, add attempts, checks, and handoffs
-as thin end-to-end slices. Each slice should implement the approved protocol
-rather than inventing its contract inside command code.
+After the context contract is proven in use, attempts are added as the next thin
+end-to-end slice. Checks and handoffs follow separately. Each slice should
+implement the approved protocol rather than inventing its contract inside
+command code.
 
 ## What SESS should not store
 
