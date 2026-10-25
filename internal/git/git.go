@@ -501,7 +501,7 @@ func CommitAmend(ctx context.Context, dir string) error {
 // IsDirty checks if there are any uncommitted changes in the repo.
 // Returns true if there are staged or unstaged changes.
 func IsDirty(ctx context.Context, dir string) (bool, error) {
-	out, err := RunCombined(ctx, dir, "status", "--porcelain")
+	out, err := RunCombined(ctx, dir, "--no-optional-locks", "status", "--porcelain")
 	if err != nil {
 		return false, err
 	}

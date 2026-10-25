@@ -1,7 +1,9 @@
 package db
 
 import (
+	"bytes"
 	"database/sql"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -9,6 +11,71 @@ import (
 
 	_ "modernc.org/sqlite"
 )
+
+func TestOpenReadOnlyPreservesDatabase(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	createdPath := filepath.Join(dir, "created.db")
+	path := filepath.Join(dir, "sess ? # context.db")
+	database, err := Open(createdPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := database.CreateProject("project", t.TempDir(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(createdPath, path); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	readOnly, err := OpenReadOnly(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := readOnly.GetProjectByID(project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.Name != project.Name {
+		t.Fatalf("project = %#v, want %#v", got, project)
+	}
+	if _, err := readOnly.CreateProject("other", t.TempDir(), "main"); err == nil {
+		t.Fatal("CreateProject() succeeded on read-only database")
+	}
+	if err := readOnly.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Fatal("read-only access changed database contents")
+	}
+}
+
+func TestOpenReadOnlyDoesNotCreateMissingDatabase(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "missing.db")
+	if database, err := OpenReadOnly(path); err == nil {
+		database.Close()
+		t.Fatal("OpenReadOnly() succeeded for missing database")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("missing database was created: %v", err)
+	}
+}
 
 func newTestDB(t *testing.T) *DB {
 	t.Helper()

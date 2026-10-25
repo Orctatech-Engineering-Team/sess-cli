@@ -4,8 +4,10 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -59,12 +61,7 @@ func GetDefaultDBPath() (string, error) {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	sessDir := filepath.Join(home, ".sess-cli")
-	if err := os.MkdirAll(sessDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create .sess-cli directory: %w", err)
-	}
-
-	return filepath.Join(sessDir, "sess.db"), nil
+	return filepath.Join(home, ".sess-cli", "sess.db"), nil
 }
 
 // Open opens or creates the database at the given path
@@ -91,6 +88,32 @@ func Open(path string) (*DB, error) {
 	}
 
 	return db, nil
+}
+
+// OpenReadOnly opens an existing database without applying migrations.
+func OpenReadOnly(path string) (*DB, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve database path: %w", err)
+	}
+	uriPath := filepath.ToSlash(absPath)
+	if runtime.GOOS == "windows" {
+		uriPath = "/" + uriPath
+	}
+	uri := &url.URL{Scheme: "file", Path: uriPath}
+	query := uri.Query()
+	query.Set("mode", "ro")
+	uri.RawQuery = query.Encode()
+
+	conn, err := sql.Open("sqlite", uri.String())
+	if err != nil {
+		return nil, fmt.Errorf("open database read-only: %w", err)
+	}
+	if err := conn.Ping(); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("open database read-only: %w", err)
+	}
+	return &DB{conn: conn, path: absPath}, nil
 }
 
 // init creates the database schema if it doesn't exist

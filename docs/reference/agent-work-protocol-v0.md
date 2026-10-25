@@ -4,8 +4,14 @@
 **Issue:** [#10](https://github.com/Orctatech-Engineering-Team/sess-cli/issues/10)
 
 This document defines a small, local-first protocol for humans and coding agents
-working in the same SESS session. It defines data contracts only. It does not
-authorize CLI commands, database migrations, or agent automation.
+working in the same SESS session. It defines the contracts that each
+implementation slice must follow; it does not authorize agent automation.
+
+## Implementation status
+
+The first slice, `sess context --json`, implements the read-only context
+envelope using existing project, session, and Git state. Attempts, checks, and
+handoffs are still protocol contracts only and return empty or `null` values.
 
 ## Design goals
 

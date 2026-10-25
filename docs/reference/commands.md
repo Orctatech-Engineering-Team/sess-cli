@@ -83,6 +83,35 @@ sess pause
 - stops active time accumulation
 - preserves the branch and issue context in the database
 
+## `sess context --json`
+
+Shows a read-only Agent Work Protocol snapshot for the current directory.
+
+### Usage
+
+```bash
+sess context --json
+```
+
+### Behavior
+
+- returns the versioned `sess.agent-work/v0` JSON envelope
+- reports `no_repository`, `untracked_project`, `idle_project`, or `session`
+- includes project, session, issue, branch, base branch, commit, and worktree
+  state when available
+- returns empty attempt and check lists until those protocol slices are
+  implemented
+- reports legacy protocol history and session-branch mismatches as warnings
+- does not create or migrate the database
+- does not fetch, contact GitHub, change timers, update sessions, or modify Git
+
+`generated_at` and the repository state's `captured_at` reflect when the
+snapshot was taken. IDs are opaque protocol strings such as `project:7` and
+`session:42`.
+
+See [Agent Work Protocol v0](agent-work-protocol-v0.md) for the full JSON
+contract and compatibility rules.
+
 ## `sess resume`
 
 Resumes a paused session.
