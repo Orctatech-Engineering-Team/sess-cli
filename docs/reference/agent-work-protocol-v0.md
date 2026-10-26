@@ -13,8 +13,9 @@ The first slice, `sess context --json`, implements the read-only context
 envelope using existing project, session, and Git state. The second slice,
 `sess attempt`, implements participant identities, attempts, and advisory claims.
 The third slice, `sess check record`, implements immutable revision-bound check
-evidence. Handoffs remain a protocol contract only and return `null` until their
-slice is implemented.
+evidence. The fourth slice, `sess handoff create`, implements append-only
+handoffs and latest-valid selection. Backup, deletion, and compaction remain a
+separate future design.
 
 ## Design goals
 

@@ -176,6 +176,35 @@ sess check record <attempt-id> \
 Summaries must be redacted by the caller. SESS does not authenticate summaries
 or guarantee automatic secret detection.
 
+## `sess handoff create`
+
+Records an append-only summary for the next participant in a session.
+
+### Usage
+
+```bash
+sess handoff create <attempt-id> \
+  --done "Implemented the change" \
+  --remaining "Review the change" \
+  --risk "None known" \
+  --next "Run review" \
+  --check check:abc123
+```
+
+### Behavior
+
+- ties the handoff to the current session and source attempt
+- records completed work, remaining work, risks, and one next action
+- accepts supporting checks from the same attempt
+- preserves the repository state observed at handoff time
+- corrects an earlier handoff by appending with `--supersedes`
+- keeps the original handoff available for history
+- exposes the latest non-superseded handoff through `sess context --json`
+- warns when the latest handoff was recorded at another repository revision
+- limits list entries, text, and check references
+
+Handoffs do not finish attempts, end sessions, approve reviews, or release work.
+
 ## `sess resume`
 
 Resumes a paused session.

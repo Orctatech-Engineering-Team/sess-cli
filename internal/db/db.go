@@ -225,6 +225,29 @@ func (db *DB) init() error {
 
 	CREATE INDEX IF NOT EXISTS idx_checks_attempt_id ON checks(attempt_id);
 
+	CREATE TABLE IF NOT EXISTS handoffs (
+		id TEXT PRIMARY KEY,
+		session_id INTEGER NOT NULL,
+		attempt_id TEXT NOT NULL,
+		created_at DATETIME NOT NULL,
+		repository TEXT,
+		branch TEXT,
+		head_oid TEXT,
+		worktree TEXT NOT NULL,
+		captured_at DATETIME NOT NULL,
+		completed_json TEXT NOT NULL,
+		remaining_json TEXT NOT NULL,
+		risks_json TEXT NOT NULL,
+		next_action TEXT NOT NULL,
+		check_ids_json TEXT NOT NULL,
+		supersedes_id TEXT,
+		FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+		FOREIGN KEY (attempt_id) REFERENCES attempts(id) ON DELETE CASCADE,
+		FOREIGN KEY (supersedes_id) REFERENCES handoffs(id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_handoffs_session_created ON handoffs(session_id, created_at, id);
+
 	CREATE TABLE IF NOT EXISTS session_events (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		session_id INTEGER NOT NULL,

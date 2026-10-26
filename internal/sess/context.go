@@ -37,7 +37,7 @@ type contextData struct {
 	Session         *contextSession         `json:"session"`
 	RepositoryState *contextRepositoryState `json:"repository_state"`
 	ActiveAttempts  []*contextAttempt       `json:"active_attempts"`
-	LatestHandoff   any                     `json:"latest_handoff"`
+	LatestHandoff   *contextHandoff         `json:"latest_handoff"`
 	Checks          []*contextCheck         `json:"checks"`
 	Warnings        []contextWarning        `json:"warnings"`
 }
@@ -102,6 +102,20 @@ type contextCheck struct {
 	RepositoryState contextRepositoryState `json:"repository_state"`
 	Reproducibility string                 `json:"reproducibility"`
 	Summary         string                 `json:"summary"`
+}
+
+type contextHandoff struct {
+	ID              string                 `json:"id"`
+	SessionID       string                 `json:"session_id"`
+	AttemptID       string                 `json:"attempt_id"`
+	CreatedAt       string                 `json:"created_at"`
+	RepositoryState contextRepositoryState `json:"repository_state"`
+	Completed       []string               `json:"completed"`
+	Remaining       []string               `json:"remaining"`
+	Risks           []string               `json:"risks"`
+	NextAction      string                 `json:"next_action"`
+	CheckIDs        []string               `json:"check_ids"`
+	SupersedesID    string                 `json:"supersedes_id"`
 }
 
 type contextRepositoryState struct {
@@ -282,6 +296,31 @@ func readContextSession(cwd, dbPath, generatedAt string, data *contextData) (err
 					})
 				}
 			}
+			handoffs, err := database.ListHandoffsForSession(current.ID)
+			if err != nil {
+				return fmt.Errorf("list handoffs: %w", err)
+			}
+			superseded := make(map[string]bool)
+			for _, handoff := range handoffs {
+				if handoff.SupersedesID != "" {
+					superseded[handoff.SupersedesID] = true
+				}
+			}
+			for i := len(handoffs) - 1; i >= 0; i-- {
+				if superseded[handoffs[i].ID] {
+					continue
+				}
+				data.LatestHandoff = contextHandoffFromDB(handoffs[i])
+				if data.RepositoryState.HeadOID != nil &&
+					handoffs[i].RepositoryState.HeadOID != "" &&
+					*data.RepositoryState.HeadOID != handoffs[i].RepositoryState.HeadOID {
+					data.Warnings = append(data.Warnings, contextWarning{
+						Code:    "handoff_stale",
+						Message: fmt.Sprintf("Handoff %s was recorded at a different repository revision.", handoffs[i].ID),
+					})
+				}
+				break
+			}
 		}
 	}
 	return nil
@@ -321,6 +360,19 @@ func contextCheckFromDB(check *db.Check) *contextCheck {
 		ExitCode:        check.ExitCode,
 		RepositoryState: *contextRepositoryStateFromDB(&check.RepositoryState),
 		Reproducibility: check.Reproducibility, Summary: check.Summary,
+	}
+}
+
+func contextHandoffFromDB(handoff *db.Handoff) *contextHandoff {
+	return &contextHandoff{
+		ID:              contextRecordIDString("handoff", handoff.ID),
+		SessionID:       contextRecordID("session", handoff.SessionID),
+		AttemptID:       contextRecordIDString("attempt", handoff.AttemptID),
+		CreatedAt:       handoff.CreatedAt.UTC().Format(time.RFC3339Nano),
+		RepositoryState: *contextRepositoryStateFromDB(&handoff.RepositoryState),
+		Completed:       handoff.Completed, Remaining: handoff.Remaining, Risks: handoff.Risks,
+		NextAction: handoff.NextAction, CheckIDs: handoff.CheckIDs,
+		SupersedesID: handoff.SupersedesID,
 	}
 }
 

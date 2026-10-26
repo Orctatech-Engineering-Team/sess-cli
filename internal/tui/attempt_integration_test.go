@@ -79,6 +79,17 @@ func TestAttemptLifecycleRecordsIdentityClaimsAndTransitions(t *testing.T) {
 	if check.Outcome != db.CheckPassed || check.Reproducibility == "" {
 		t.Fatalf("check = %#v", check)
 	}
+	handoff, err := RunHandoffCreate(repo, database, HandoffCreateInput{
+		AttemptID: result.Attempt.ID, Completed: []string{"Implemented the attempt."},
+		Remaining: []string{"Review the change."}, Risks: []string{"None known."},
+		NextAction: "Review the change.", CheckIDs: []string{check.ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if handoff.AttemptID != result.Attempt.ID || len(handoff.CheckIDs) != 1 {
+		t.Fatalf("handoff = %#v", handoff)
+	}
 
 	if _, err := session.NewManager(database).GetActiveSession(project.ID); err != nil {
 		t.Fatal(err)

@@ -178,6 +178,17 @@ func TestContextCommandSessionContract(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if err := database.CreateHandoff(&db.Handoff{
+		ID: "handoff:context", SessionID: started.ID, AttemptID: "attempt:context",
+		CreatedAt: participant.CreatedAt, RepositoryState: db.RepositoryState{
+			Branch: "feature/context", Worktree: "clean", CapturedAt: participant.CreatedAt,
+		},
+		Completed: []string{"Implemented context integration."},
+		Remaining: []string{"Review the next slice."}, Risks: []string{"None known."},
+		NextAction: "Review the next slice.", CheckIDs: []string{"check:context"},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	closeContextTestDB(t, database)
 	indexPath := filepath.Join(cwd, ".git", "index")
 	indexBefore, err := os.ReadFile(indexPath)
@@ -228,7 +239,8 @@ func TestContextCommandSessionContract(t *testing.T) {
 		len(envelope.Data.ActiveAttempts[0].Claims) != 1 ||
 		len(envelope.Data.Checks) != 1 ||
 		envelope.Data.Checks[0].ID != "check:context" ||
-		envelope.Data.LatestHandoff != nil {
+		envelope.Data.LatestHandoff == nil ||
+		envelope.Data.LatestHandoff.ID != "handoff:handoff:context" {
 		t.Fatalf("protocol history = attempts %#v, checks %#v, handoff %#v",
 			envelope.Data.ActiveAttempts, envelope.Data.Checks, envelope.Data.LatestHandoff)
 	}
