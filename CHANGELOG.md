@@ -2,6 +2,39 @@
 
 This changelog tracks user-visible improvements to SESS.
 
+## v0.6.0 - 2026-10-26
+
+SESS now gives humans and coding agents a shared work-session structure.
+Sessions can carry participant attempts, validation evidence, and durable
+handoffs without storing private reasoning or full command transcripts.
+
+### What's new
+
+- Added `sess context --json` for read-only, versioned session context.
+- Added `sess attempt start`, `block`, `resume`, and `finish`.
+- Added stable self-asserted participant IDs for human, agent, and automation
+  identities.
+- Added advisory scope claims with overlap and stale-attempt warnings.
+- Added `sess check record` for revision-bound command or manual validation.
+- Added `sess handoff create` for append-only work summaries and corrections.
+- Added Bash completion setup instructions without requiring sudo.
+
+### Reliability and safety
+
+- Context reads SQLite in read-only mode and does not initialize missing state.
+- Context avoids optional Git locks and does not modify the Git index.
+- Checks store bounded summaries instead of raw stdout, stderr, prompts, or
+  environment variables.
+- Handoff corrections preserve the original record through `supersedes_id`.
+- Legacy databases continue to report empty protocol history without invented
+  attempts, checks, or handoffs.
+
+### Notes
+
+- Participant IDs provide attribution, not authentication.
+- Protocol records remain indefinitely by default. Backup, export, deletion,
+  and compaction are designed but not implemented.
+
 ## v0.5.1 - 2026-10-13
 
 You can now install SESS for your own account without administrator access.

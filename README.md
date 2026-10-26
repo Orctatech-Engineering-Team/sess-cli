@@ -101,6 +101,38 @@ junctions stop with guidance rather than creating a second copy.
 Use `Get-Command sess` and `sess --version` to check the result.
 You can also update manually by replacing the executable from the ZIP archive.
 
+### Enable Bash Completion
+
+Completion is optional and is not enabled by the installer. For the current
+Bash session:
+
+```bash
+source <(sess completion bash)
+```
+
+On Linux, save it for future terminals without sudo:
+
+```bash
+completion_dir="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions"
+mkdir -p "$completion_dir"
+sess completion bash > "$completion_dir/sess"
+source "$completion_dir/sess"
+```
+
+With `bash-completion` installed and loaded by your shell, new terminals load
+this file when you complete a `sess` command. If that loader is not available,
+follow your distribution's setup instructions, or add the `source` command
+with the saved file's path to `~/.bashrc`.
+
+Try `sess sta` followed by Tab to see command suggestions. Regenerate the file
+after upgrading to get completion changes.
+
+SESS also generates completion scripts for Zsh, Fish, and PowerShell:
+
+```bash
+sess completion --help
+```
+
 ## Prerequisites
 
 - `git`
@@ -147,6 +179,10 @@ Typical workflow:
 | `sess history` | Show recent session history for the current project or all tracked projects |
 | `sess stats` | Show aggregate session statistics for the current project or all tracked projects |
 | `sess report` | Show a compact session report with summary metrics and recent sessions |
+| `sess context --json` | Emit read-only structured session context |
+| `sess attempt` | Manage human, agent, and automation work attempts |
+| `sess check record` | Record revision-bound validation evidence |
+| `sess handoff create` | Record an append-only session handoff |
 
 ## Documentation
 
@@ -182,6 +218,10 @@ Implemented:
 - `sess history`
 - `sess stats`
 - `sess report`
+- `sess context --json`
+- `sess attempt`
+- `sess check record`
+- `sess handoff create`
 
 Interrupted `sess end` workflows resume from saved checkpoints. Resolve Git
 conflicts manually, then retry; saved PR inputs and completed handoff phases

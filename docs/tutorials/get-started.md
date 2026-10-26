@@ -46,6 +46,15 @@ Check that it is available:
 sess --version
 ```
 
+Optional: enable command and flag completion in your current Bash terminal:
+
+```bash
+source <(sess completion bash)
+```
+
+See [Bash completion setup](../../README.md#enable-bash-completion) to keep it
+enabled in future terminals without sudo.
+
 ## 2. Move Into a Repository
 
 ```bash
