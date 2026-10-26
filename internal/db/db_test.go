@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -17,7 +18,11 @@ func TestOpenReadOnlyPreservesDatabase(t *testing.T) {
 
 	dir := t.TempDir()
 	createdPath := filepath.Join(dir, "created.db")
-	path := filepath.Join(dir, "sess ? # context.db")
+	name := "sess context.db"
+	if runtime.GOOS != "windows" {
+		name = "sess ? # context.db"
+	}
+	path := filepath.Join(dir, name)
 	database, err := Open(createdPath)
 	if err != nil {
 		t.Fatal(err)
