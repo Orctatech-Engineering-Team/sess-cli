@@ -1,6 +1,6 @@
 # Agent Work Protocol record lifecycle
 
-**Status:** Draft for maintainer review  
+**Status:** Approved for future implementation planning
 **Issue:** [#15](https://github.com/Orctatech-Engineering-Team/sess-cli/issues/15)
 
 Protocol v0 keeps attempts, checks, and handoffs indefinitely. This document
@@ -242,9 +242,9 @@ human-written work summaries. Implementations must:
   warning that caller-supplied text cannot be fully inspected
 - make archive checksums and record counts visible to the user
 
-## Open decisions
+## Approved decisions
 
-This draft recommends:
+The maintainer approved these decisions on 2026-10-18:
 
 1. Backup before every destructive operation.
 2. JSON Lines for the first export format.
@@ -254,5 +254,5 @@ This draft recommends:
 6. Verified archive manifest before compaction removes source rows.
 7. No automatic cleanup in Protocol v0.
 
-Maintainer approval is required before adding backup, export, deletion, or
-compaction commands.
+These decisions define the design boundary for future backup, export, deletion,
+and compaction issues. They do not authorize implementation by themselves.
