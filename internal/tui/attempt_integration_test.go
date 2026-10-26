@@ -68,6 +68,17 @@ func TestAttemptLifecycleRecordsIdentityClaimsAndTransitions(t *testing.T) {
 		finished.ResultRepositoryState == nil {
 		t.Fatalf("finished attempt = %#v", finished)
 	}
+	check, err := RunCheckRecord(repo, database, CheckRecordInput{
+		AttemptID: result.Attempt.ID, Name: "Go tests",
+		ProcedureType: db.CheckCommand, ProcedureValue: "go test ./...",
+		Outcome: db.CheckPassed, Summary: "All packages passed.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if check.Outcome != db.CheckPassed || check.Reproducibility == "" {
+		t.Fatalf("check = %#v", check)
+	}
 
 	if _, err := session.NewManager(database).GetActiveSession(project.ID); err != nil {
 		t.Fatal(err)

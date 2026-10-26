@@ -202,6 +202,29 @@ func (db *DB) init() error {
 
 	CREATE INDEX IF NOT EXISTS idx_attempt_claims_attempt_id ON attempt_claims(attempt_id);
 
+	CREATE TABLE IF NOT EXISTS checks (
+		id TEXT PRIMARY KEY,
+		attempt_id TEXT NOT NULL,
+		name TEXT NOT NULL,
+		procedure_type TEXT NOT NULL CHECK(procedure_type IN ('command', 'manual')),
+		procedure_value TEXT NOT NULL,
+		outcome TEXT NOT NULL CHECK(outcome IN ('passed', 'failed', 'cancelled', 'unavailable')),
+		started_at DATETIME NOT NULL,
+		finished_at DATETIME NOT NULL,
+		exit_code INTEGER,
+		repository TEXT,
+		branch TEXT,
+		head_oid TEXT,
+		worktree TEXT NOT NULL,
+		captured_at DATETIME NOT NULL,
+		reproducibility TEXT NOT NULL CHECK(reproducibility IN ('revision', 'workspace', 'unknown')),
+		summary TEXT NOT NULL DEFAULT '',
+		output_reference TEXT,
+		FOREIGN KEY (attempt_id) REFERENCES attempts(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_checks_attempt_id ON checks(attempt_id);
+
 	CREATE TABLE IF NOT EXISTS session_events (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		session_id INTEGER NOT NULL,

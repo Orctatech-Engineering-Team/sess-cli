@@ -32,6 +32,11 @@ The first step is to design a small
 attempts, checks, and handoffs. Commands and persistence follow only after that
 contract is clear.
 
+Over time, SESS can support delegated agent identities: an agent may act as an
+alternate work persona for a human principal. That relationship should preserve
+both identities, its scope, and its lifetime. A participant ID provides
+attribution; delegation and authentication are separate concerns.
+
 ## Core Principles
 
 **Intentionality over autopilot.** Every session is a conscious choice. SESS does not silently track your work in the background. You start a session when you begin focused work, you pause when you step away, and you end when the work ships. This is not a time tracker that runs all day. It is a tool that respects the difference between being at your desk and actually doing focused work.

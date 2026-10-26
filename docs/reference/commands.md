@@ -146,6 +146,36 @@ sess attempt finish <attempt-id> --state completed
 Participant IDs provide self-asserted attribution. They do not authenticate a
 human, agent, or automation profile. Attempts appear in `sess context --json`.
 
+## `sess check record`
+
+Records validation evidence for an attempt without storing raw command output.
+
+### Usage
+
+```bash
+sess check record <attempt-id> \
+  --name "Go tests" \
+  --procedure-type command \
+  --procedure "go test ./..." \
+  --outcome passed \
+  --summary "All packages passed."
+```
+
+### Behavior
+
+- ties the check to the current session's attempt and repository state
+- supports `command` and `manual` procedures
+- supports `passed`, `failed`, `cancelled`, and `unavailable` outcomes
+- records `revision`, `workspace`, or `unknown` reproducibility
+- limits procedure and summary size
+- stores only a short caller-supplied summary, not stdout, stderr, prompts, or
+  environment variables
+- creates a new immutable check for every retry
+- exposes checks and stale-revision warnings through `sess context --json`
+
+Summaries must be redacted by the caller. SESS does not authenticate summaries
+or guarantee automatic secret detection.
+
 ## `sess resume`
 
 Resumes a paused session.

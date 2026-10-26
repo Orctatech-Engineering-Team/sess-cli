@@ -12,8 +12,9 @@ implementation slice must follow; it does not authorize agent automation.
 The first slice, `sess context --json`, implements the read-only context
 envelope using existing project, session, and Git state. The second slice,
 `sess attempt`, implements participant identities, attempts, and advisory claims.
-Checks and handoffs remain protocol contracts only and return empty or `null`
-values.
+The third slice, `sess check record`, implements immutable revision-bound check
+evidence. Handoffs remain a protocol contract only and return `null` until their
+slice is implemented.
 
 ## Design goals
 
@@ -211,6 +212,26 @@ or signatures with a participant ID without changing historical attempt IDs.
 Participant IDs are self-asserted. They do not prove that a human, model, or
 orchestrator is who it claims to be. Interfaces must not display them as verified
 identity.
+
+### Future delegated identities
+
+SESS may later represent an agent as an alternate work persona for a human
+principal:
+
+```json
+{
+  "principal_id": "participant:adjanour",
+  "delegate_id": "participant:adjanour-agent",
+  "scope": ["implementation", "review"],
+  "issued_at": "2026-10-18T10:00:00Z",
+  "expires_at": null,
+  "revoked_at": null
+}
+```
+
+This relationship must preserve both participant IDs. It must not turn
+self-asserted attribution into authentication. Scope, expiration, revocation,
+and optional verification belong to a later protocol version.
 
 Attempt `role` is `implementation`, `review`, `research`, `release`, or `other`.
 Role describes the attempt's purpose; it grants no permission.

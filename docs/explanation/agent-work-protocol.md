@@ -257,9 +257,11 @@ Protocol v0 resolves record ownership, attribution, claims, check evidence,
 handoff correction, and initial retention. Later versions still need to decide:
 
 1. How could a self-asserted participant ID gain optional verification?
-2. Which records may eventually be shared through Git?
-3. How should backup, export, explicit deletion, and compaction work?
-4. What additional evidence is required for independent review approval?
+2. How should delegated agent identities represent a human principal, scope,
+   expiration, and revocation?
+3. Which records may eventually be shared through Git?
+4. How should backup, export, explicit deletion, and compaction work?
+5. What additional evidence is required for independent review approval?
 
 The answers should be tested against concrete human-only, agent-only, and mixed
 handoff scenarios before those capabilities expand the protocol.

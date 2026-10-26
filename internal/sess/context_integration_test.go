@@ -167,6 +167,17 @@ func TestContextCommandSessionContract(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if err := database.CreateCheck(&db.Check{
+		ID: "check:context", AttemptID: "attempt:context", Name: "Go tests",
+		ProcedureType: db.CheckCommand, ProcedureValue: "go test ./...",
+		Outcome: db.CheckPassed, StartedAt: participant.CreatedAt,
+		FinishedAt: participant.CreatedAt, RepositoryState: db.RepositoryState{
+			Branch: "feature/context", Worktree: "clean", CapturedAt: participant.CreatedAt,
+		},
+		Reproducibility: "revision", Summary: "passed",
+	}); err != nil {
+		t.Fatal(err)
+	}
 	closeContextTestDB(t, database)
 	indexPath := filepath.Join(cwd, ".git", "index")
 	indexBefore, err := os.ReadFile(indexPath)
@@ -215,7 +226,8 @@ func TestContextCommandSessionContract(t *testing.T) {
 		envelope.Data.ActiveAttempts[0].ID != "attempt:attempt:context" ||
 		envelope.Data.ActiveAttempts[0].Participant.ID != participant.ID ||
 		len(envelope.Data.ActiveAttempts[0].Claims) != 1 ||
-		envelope.Data.Checks == nil || len(envelope.Data.Checks) != 0 ||
+		len(envelope.Data.Checks) != 1 ||
+		envelope.Data.Checks[0].ID != "check:context" ||
 		envelope.Data.LatestHandoff != nil {
 		t.Fatalf("protocol history = attempts %#v, checks %#v, handoff %#v",
 			envelope.Data.ActiveAttempts, envelope.Data.Checks, envelope.Data.LatestHandoff)

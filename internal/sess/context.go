@@ -38,7 +38,7 @@ type contextData struct {
 	RepositoryState *contextRepositoryState `json:"repository_state"`
 	ActiveAttempts  []*contextAttempt       `json:"active_attempts"`
 	LatestHandoff   any                     `json:"latest_handoff"`
-	Checks          []any                   `json:"checks"`
+	Checks          []*contextCheck         `json:"checks"`
 	Warnings        []contextWarning        `json:"warnings"`
 }
 
@@ -87,6 +87,21 @@ type contextClaim struct {
 	Type      string `json:"type"`
 	Value     string `json:"value"`
 	CreatedAt string `json:"created_at"`
+}
+
+type contextCheck struct {
+	ID              string                 `json:"id"`
+	AttemptID       string                 `json:"attempt_id"`
+	Name            string                 `json:"name"`
+	ProcedureType   string                 `json:"procedure_type"`
+	ProcedureValue  string                 `json:"procedure"`
+	Outcome         string                 `json:"outcome"`
+	StartedAt       string                 `json:"started_at"`
+	FinishedAt      string                 `json:"finished_at"`
+	ExitCode        *int                   `json:"exit_code"`
+	RepositoryState contextRepositoryState `json:"repository_state"`
+	Reproducibility string                 `json:"reproducibility"`
+	Summary         string                 `json:"summary"`
 }
 
 type contextRepositoryState struct {
@@ -139,7 +154,7 @@ func writeContext(ctx stdcontext.Context, w io.Writer, cwd, dbPath string, now t
 	data := contextData{
 		Availability:   "no_repository",
 		ActiveAttempts: make([]*contextAttempt, 0),
-		Checks:         make([]any, 0),
+		Checks:         make([]*contextCheck, 0),
 		Warnings:       make([]contextWarning, 0),
 	}
 
@@ -251,6 +266,22 @@ func readContextSession(cwd, dbPath, generatedAt string, data *contextData) (err
 					}
 				}
 			}
+			checks, err := database.ListChecksForSession(current.ID)
+			if err != nil {
+				return fmt.Errorf("list checks: %w", err)
+			}
+			data.Checks = make([]*contextCheck, 0, len(checks))
+			for _, check := range checks {
+				data.Checks = append(data.Checks, contextCheckFromDB(check))
+				if data.RepositoryState.HeadOID != nil &&
+					check.RepositoryState.HeadOID != "" &&
+					*data.RepositoryState.HeadOID != check.RepositoryState.HeadOID {
+					data.Warnings = append(data.Warnings, contextWarning{
+						Code:    "check_stale",
+						Message: fmt.Sprintf("Check %s was recorded at a different repository revision.", check.ID),
+					})
+				}
+			}
 		}
 	}
 	return nil
@@ -277,6 +308,19 @@ func contextAttemptFromDB(attempt *db.Attempt) *contextAttempt {
 		ResultRepositoryState: contextRepositoryStateFromDB(attempt.ResultRepositoryState),
 		Claims:                claims,
 		BlockedReason:         attempt.BlockedReason,
+	}
+}
+
+func contextCheckFromDB(check *db.Check) *contextCheck {
+	return &contextCheck{
+		ID: check.ID, AttemptID: contextRecordIDString("attempt", check.AttemptID),
+		Name: check.Name, ProcedureType: check.ProcedureType,
+		ProcedureValue: check.ProcedureValue, Outcome: check.Outcome,
+		StartedAt:       check.StartedAt.UTC().Format(time.RFC3339Nano),
+		FinishedAt:      check.FinishedAt.UTC().Format(time.RFC3339Nano),
+		ExitCode:        check.ExitCode,
+		RepositoryState: *contextRepositoryStateFromDB(&check.RepositoryState),
+		Reproducibility: check.Reproducibility, Summary: check.Summary,
 	}
 }
 
